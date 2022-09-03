@@ -1,7 +1,7 @@
-package store
+package repository
 
 import (
-	"benny/models"
+	models2 "benny/src/models"
 	"context"
 	"errors"
 	"fmt"
@@ -11,12 +11,12 @@ import (
 )
 
 type ShiftRepository interface {
-	Create(barberId edgedb.UUID, shift *models.BarberShift) (*models.BarberShift, error)
-	GetAll(barberId edgedb.UUID) ([]models.BarberShift, bool)
-	GetActual(barberId edgedb.UUID) ([]models.BarberShift, bool)
-	Get(shiftId edgedb.UUID) (models.BarberShift, bool)
+	Create(barberId edgedb.UUID, shift *models2.BarberShift) (*models2.BarberShift, error)
+	GetAll(barberId edgedb.UUID) ([]models2.BarberShift, bool)
+	GetActual(barberId edgedb.UUID) ([]models2.BarberShift, bool)
+	Get(shiftId edgedb.UUID) (models2.BarberShift, bool)
 	Delete(shiftId edgedb.UUID) bool
-	UpdateStatus(shiftId edgedb.UUID, status models.ShiftStatus) (models.BarberShift, bool)
+	UpdateStatus(shiftId edgedb.UUID, status models2.ShiftStatus) (models2.BarberShift, bool)
 }
 
 type ShiftRepositoryImpl struct {
@@ -24,7 +24,7 @@ type ShiftRepositoryImpl struct {
 	client *edgedb.Client
 }
 
-func (r *ShiftRepositoryImpl) Create(barberId edgedb.UUID, shift *models.BarberShift) (*models.BarberShift, error) {
+func (r *ShiftRepositoryImpl) Create(barberId edgedb.UUID, shift *models2.BarberShift) (*models2.BarberShift, error) {
 	ctx := context.Background()
 	client, closer := NewDBClient(ctx)
 	defer closer()
@@ -56,11 +56,11 @@ func (r *ShiftRepositoryImpl) Create(barberId edgedb.UUID, shift *models.BarberS
 	return shift, nil
 }
 
-func (r *ShiftRepositoryImpl) GetAll(barberId edgedb.UUID) ([]models.BarberShift, bool) {
+func (r *ShiftRepositoryImpl) GetAll(barberId edgedb.UUID) ([]models2.BarberShift, bool) {
 	ctx := context.Background()
 	client, closer := NewDBClient(ctx)
 	defer closer()
-	var shifts []models.BarberShift
+	var shifts []models2.BarberShift
 	var query = fmt.Sprintf("select BarberShift{id, barber: {fullName, timeZoneOffset}, plannedFrom, plannedTo} filter .barber.id = <uuid>'%s';", barberId)
 	err := client.Query(ctx, query, &shifts)
 	if err != nil {
@@ -70,15 +70,15 @@ func (r *ShiftRepositoryImpl) GetAll(barberId edgedb.UUID) ([]models.BarberShift
 	return shifts, len(shifts) == 0
 }
 
-func (r *ShiftRepositoryImpl) GetActual(barberId edgedb.UUID) ([]models.BarberShift, bool) {
+func (r *ShiftRepositoryImpl) GetActual(barberId edgedb.UUID) ([]models2.BarberShift, bool) {
 	ctx := context.Background()
 	client, closer := NewDBClient(ctx)
 	defer closer()
-	var shifts []models.BarberShift
+	var shifts []models2.BarberShift
 	var query = fmt.Sprintf("select BarberShift "+
 		"{id, barber: {fullName, timeZoneOffset}, plannedFrom, plannedTo}"+
 		" filter .barber.id = <uuid>'%s'"+
-		" and .status = ShiftStatus.%s or .status = ShiftStatus.%s;", barberId, models.Planned, models.Work)
+		" and .status = ShiftStatus.%s or .status = ShiftStatus.%s;", barberId, models2.Planned, models2.Work)
 	err := client.Query(ctx, query, &shifts)
 	if err != nil {
 		log.Fatal(err)
@@ -87,11 +87,11 @@ func (r *ShiftRepositoryImpl) GetActual(barberId edgedb.UUID) ([]models.BarberSh
 	return shifts, len(shifts) == 0
 }
 
-func (r *ShiftRepositoryImpl) Get(shiftId edgedb.UUID) (models.BarberShift, bool) {
+func (r *ShiftRepositoryImpl) Get(shiftId edgedb.UUID) (models2.BarberShift, bool) {
 	ctx := context.Background()
 	client, closer := NewDBClient(ctx)
 	defer closer()
-	var shift models.BarberShift
+	var shift models2.BarberShift
 	var query = fmt.Sprintf("select BarberShift{"+
 		"id, barber: {fullName, timeZoneOffset}, status, plannedFrom, plannedTo, actualFrom, actualTo, visits: {"+
 		"customer: {fullName, phone}}}"+
@@ -108,7 +108,7 @@ func (r *ShiftRepositoryImpl) Delete(shiftId edgedb.UUID) bool {
 	ctx := context.Background()
 	client, closer := NewDBClient(ctx)
 	defer closer()
-	var shift models.BarberShift
+	var shift models2.BarberShift
 
 	var query = fmt.Sprintf("update BarberShift filter .id=<uuid>'%s' set {deleted := true};", shiftId)
 	err := client.QuerySingle(ctx, query, &shift)
@@ -118,13 +118,13 @@ func (r *ShiftRepositoryImpl) Delete(shiftId edgedb.UUID) bool {
 	return shift.Missing()
 }
 
-func (r *ShiftRepositoryImpl) UpdateStatus(shiftId edgedb.UUID, status models.ShiftStatus) (models.BarberShift, bool) {
+func (r *ShiftRepositoryImpl) UpdateStatus(shiftId edgedb.UUID, status models2.ShiftStatus) (models2.BarberShift, bool) {
 	ctx := context.Background()
 	client, closer := NewDBClient(ctx)
 	defer closer()
 
 	var query = fmt.Sprintf("update BarberShift filter .id=<uuid>'%s' set {status := ShiftStatus.%s}", shiftId, status)
-	var shift models.BarberShift
+	var shift models2.BarberShift
 	err := client.QuerySingle(ctx, query, &shift)
 	if err != nil {
 		log.Fatal(err)

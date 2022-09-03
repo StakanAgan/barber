@@ -59,7 +59,7 @@ func (s *StateManagerImpl) Get() State {
 }
 
 func (s *StateManagerImpl) Set(state State) error {
-	return s.client.Set(s.ctx, s.key, state, 0).Err()
+	return s.client.Set(s.ctx, s.key, state.String(), 0).Err()
 }
 
 func (s *StateManagerImpl) Reset() {

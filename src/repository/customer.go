@@ -1,7 +1,7 @@
-package store
+package repository
 
 import (
-	"benny/models"
+	"benny/src/models"
 	"context"
 	"fmt"
 	"github.com/edgedb/edgedb-go"

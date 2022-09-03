@@ -10,7 +10,7 @@ module default {
     required property timeZoneOffset -> int64{
       default := 3;
     };
-    multi link visits -> Visit;
+    multi link visits := .<customer[is Visit]
   }
   scalar type ServiceType extending enum<Hair, Beard, HairBeard>;
 
@@ -19,14 +19,14 @@ module default {
     required property phone -> str{
       constraint exclusive;
     };
-    required property availableTypes -> array<ServiceType>;
     required property telegramId -> int64{
       constraint exclusive;
     };
     required property timeZoneOffset -> int64{
       default := 3;
     };
-    multi link shifts -> BarberShift;
+    multi link shifts := .<barber[is BarberShift];
+    multi link services := .<barber[is Service] 
   }
   scalar type ShiftStatus extending enum<Planned, Work, Finished>;
   type BarberShift {
@@ -42,7 +42,7 @@ module default {
     constraint expression on (
       .actualFrom < .actualTo
     );
-    multi link visits -> Visit;
+    multi link visits := .<barberShift[is Visit]
   }
   scalar type VisitStatus extending enum<Created, InProcess, Done, Canceled>;
   type Visit {
@@ -58,7 +58,7 @@ module default {
     constraint expression on (
       .actualFrom < .actualTo
     );
-    required property serviceType -> ServiceType;
+    required link service -> Service;
     property price -> int64{
       constraint min_value(0);  
     };
@@ -73,5 +73,14 @@ module default {
     required property deleted -> bool{
       default := false;
     };
+  }
+  type Service {
+    required link barber -> Barber;
+    required property title -> str;
+    required property type -> ServiceType;
+    required property price -> int64{
+      constraint min_value(0);
+    };
+    required property duration -> duration;
   }
 }

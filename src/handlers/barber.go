@@ -1,10 +1,10 @@
 package handlers
 
 import (
-	"benny/fsm"
-	"benny/models"
-	"benny/store"
-	"benny/utils"
+	fsm2 "benny/src/fsm"
+	models2 "benny/src/models"
+	"benny/src/repository"
+	"benny/src/utils"
 	"context"
 	"fmt"
 	"github.com/edgedb/edgedb-go"
@@ -16,7 +16,7 @@ import (
 func HandleMainShifts() func(c tele.Context) error {
 	return func(c tele.Context) error {
 		ctx := context.Background()
-		store, closer := store.New(ctx)
+		store, closer := repository.New(ctx)
 		defer closer()
 
 		barber, missing := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
@@ -40,7 +40,7 @@ func HandleMainShifts() func(c tele.Context) error {
 func HandleAllShifts() func(c tele.Context) error {
 	return func(c tele.Context) error {
 		ctx := context.Background()
-		store, closer := store.New(ctx)
+		store, closer := repository.New(ctx)
 		defer closer()
 
 		barber, missing := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
@@ -64,10 +64,10 @@ func HandleAllShifts() func(c tele.Context) error {
 func HandleText() func(c tele.Context) error {
 	return func(c tele.Context) error {
 		ctx := context.Background()
-		store, closer := store.New(ctx)
+		store, closer := repository.New(ctx)
 		defer closer()
 
-		stateManager, managerCloser := fsm.New(ctx, c.Chat().ID)
+		stateManager, managerCloser := fsm2.New(ctx, c.Chat().ID)
 		defer managerCloser()
 
 		barber, missing := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
@@ -77,7 +77,7 @@ func HandleText() func(c tele.Context) error {
 		state := stateManager.State().Get()
 
 		switch state {
-		case fsm.ShiftEnter:
+		case fsm2.ShiftEnter:
 			times, err := utils.ParseTimesFromString(c.Text())
 			if err != nil {
 				return c.Send("Не тот формат, брат. Введи период в формате\n<b>29.08.2022 11:00-19:00</b>", tele.ModeHTML)
@@ -99,7 +99,7 @@ func HandleText() func(c tele.Context) error {
 					"Начало смены должно быть раньше ее конца", times.TimeFrom, times.TimeTo), tele.ModeHTML)
 			}
 
-			var shift = &models.BarberShift{PlannedFrom: plannedFrom.UTC(), Barber: *barber, PlannedTo: plannedTo.UTC()}
+			var shift = &models2.BarberShift{PlannedFrom: plannedFrom.UTC(), Barber: *barber, PlannedTo: plannedTo.UTC()}
 			shift, err = store.Shift().Create(barber.Id, shift)
 			if err != nil {
 				return c.Send("Брат, эта смена пересекается с другой\nПопробуй еще раз, но так, чтобы не пересекалась", tele.ModeHTML)
@@ -119,10 +119,10 @@ func HandleText() func(c tele.Context) error {
 func HandleStartCreateShift() func(c tele.Context) error {
 	return func(c tele.Context) error {
 		ctx := context.Background()
-		store, closer := store.New(ctx)
+		store, closer := repository.New(ctx)
 		defer closer()
 
-		stateManager, managerCloser := fsm.New(ctx, c.Chat().ID)
+		stateManager, managerCloser := fsm2.New(ctx, c.Chat().ID)
 		defer managerCloser()
 
 		_, missing := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
@@ -134,7 +134,7 @@ func HandleStartCreateShift() func(c tele.Context) error {
 		if tgerr != nil {
 			log.Fatal(tgerr)
 		}
-		err := stateManager.State().Set(fsm.ShiftEnter)
+		err := stateManager.State().Set(fsm2.ShiftEnter)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -145,7 +145,7 @@ func HandleStartCreateShift() func(c tele.Context) error {
 func HandleGetShift() func(c tele.Context) error {
 	return func(c tele.Context) error {
 		ctx := context.Background()
-		store, closer := store.New(ctx)
+		store, closer := repository.New(ctx)
 		defer closer()
 
 		_, missing := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
@@ -167,10 +167,10 @@ func HandleGetShift() func(c tele.Context) error {
 			btnAction tele.Btn
 		)
 		switch shift.Status {
-		case string(models.Planned):
+		case string(models2.Planned):
 			btnAction = BarberShiftsInlineKeyboard.Data("Начать смену", "start", shiftId.String())
 			needBtn = true
-		case string(models.Work):
+		case string(models2.Work):
 			btnAction = BarberShiftsInlineKeyboard.Data("Завершить смену", "finish", shiftId.String())
 			needBtn = true
 		default:
@@ -187,7 +187,7 @@ func HandleGetShift() func(c tele.Context) error {
 func HandleStartShift() func(c tele.Context) error {
 	return func(c tele.Context) error {
 		ctx := context.Background()
-		store, closer := store.New(ctx)
+		store, closer := repository.New(ctx)
 		defer closer()
 
 		_, missing := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
@@ -200,7 +200,7 @@ func HandleStartShift() func(c tele.Context) error {
 		if err != nil {
 			log.Fatal(err)
 		}
-		_, missing = store.Shift().UpdateStatus(*shiftId, models.Work)
+		_, missing = store.Shift().UpdateStatus(*shiftId, models2.Work)
 		return HandleGetShift()(c)
 	}
 }
@@ -208,7 +208,7 @@ func HandleStartShift() func(c tele.Context) error {
 func HandleFinishShift() func(c tele.Context) error {
 	return func(c tele.Context) error {
 		ctx := context.Background()
-		store, closer := store.New(ctx)
+		store, closer := repository.New(ctx)
 		defer closer()
 
 		_, missing := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
@@ -221,7 +221,7 @@ func HandleFinishShift() func(c tele.Context) error {
 		if err != nil {
 			log.Fatal(err)
 		}
-		_, missing = store.Shift().UpdateStatus(*shiftId, models.Finished)
+		_, missing = store.Shift().UpdateStatus(*shiftId, models2.Finished)
 		return HandleGetShift()(c)
 	}
 }

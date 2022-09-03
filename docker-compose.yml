@@ -1,12 +1,22 @@
 version: '3.9'
 
 services:
+  backend:
+    build: .
+    restart: always
+    command: "go run benny"
+    env_file:
+      - .env
+    ports:
+      - "80:80"
+    depends_on:
+      - db
+      - redis
+
   redis:
     image: "redis:7"
     restart: always
     command: redis-server /usr/local/etc/redis/redis.conf
-    ports:
-      - "6379:6379"
     volumes:
       - ./volumes/redis:/data
       - ./redis.conf:/usr/local/etc/redis/redis.conf

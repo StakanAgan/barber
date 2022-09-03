@@ -1,7 +1,7 @@
 package main
 
 import (
-	"benny/handlers"
+	"benny/src/handlers"
 	"github.com/joho/godotenv"
 	tele "gopkg.in/telebot.v3"
 	"log"
@@ -38,6 +38,8 @@ func main() {
 
 	// customer handlers
 	b.Handle(tele.OnContact, handlers.HandleReceivePhone())
+	b.Handle(&handlers.BtnCreateVisit, handlers.HandleStartCreateVisit())
+	b.Handle(&handlers.BtnSelectBarber, handlers.HandleSelectBarber())
 
 	log.Println("INFO: Bot started...")
 	b.Start()

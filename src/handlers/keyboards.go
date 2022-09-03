@@ -22,5 +22,6 @@ var (
 	BtnCreateVisit       = MainCustomerKeyboard.Text("Записаться на стригу")
 
 	CustomerShiftsInlineKeyboard = &tele.ReplyMarkup{}
-	BtnGetShiftToVisit           = CustomerShiftsInlineKeyboard.Data("Перейти к смене", "customerToShift")
+	BtnSelectBarber              = CustomerShiftsInlineKeyboard.Data("Выбрать барбера", "customerToBarber")
+	BtnSelectShiftToVisit        = CustomerShiftsInlineKeyboard.Data("Перейти к смене", "customerToShift")
 )

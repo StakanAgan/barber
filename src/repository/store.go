@@ -1,6 +1,7 @@
-package store
+package repository
 
 import (
+	"benny/src"
 	"context"
 	"github.com/edgedb/edgedb-go"
 	"log"
@@ -14,8 +15,20 @@ type Store struct {
 	shiftRepository    *ShiftRepositoryImpl
 }
 
+var config = src.NewDBConfig()
+
 func NewDBClient(ctx context.Context) (*edgedb.Client, func()) {
-	opts := edgedb.Options{}
+	opts := edgedb.Options{
+		Database: config.DBName,
+		Host:     config.Host,
+		User:     config.User,
+		Password: edgedb.NewOptionalStr(config.Password),
+		Port:     config.Port,
+		TLSOptions: edgedb.TLSOptions{
+			SecurityMode: edgedb.TLSModeInsecure,
+		},
+		Concurrency: 4,
+	}
 	client, err := edgedb.CreateClient(ctx, opts)
 	if err != nil {
 		log.Fatal(err)

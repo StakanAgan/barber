@@ -27,7 +27,7 @@ type Visit struct {
 	PlannedTo     time.Time               `edgedb:"plannedTo"`
 	ActualFrom    edgedb.OptionalDateTime `edgedb:"actualFrom"`
 	ActualTo      edgedb.OptionalDateTime `edgedb:"actualTo"`
-	ServiceType   string                  `edgedb:"serviceType"`
+	Service       Service                 `edgedb:"service"`
 	Price         uint64                  `edgedb:"price"`
 	DiscountPrice uint64                  `edgedb:"discountPrice"`
 	TotalPrice    uint64                  `edgedb:"totalPrice"`
@@ -39,7 +39,7 @@ type Barber struct {
 	Id             edgedb.UUID   `edgedb:"id"`
 	FullName       string        `edgedb:"fullName"`
 	Phone          string        `edgedb:"phone"`
-	AvailableTypes []string      `edgedb:"availableTypes"`
+	Services       []Service     `edgedb:"services"`
 	TelegramId     int64         `edgedb:"telegramId"`
 	Shifts         []BarberShift `edgedb:"shifts"`
 	TimeZoneOffset int64         `edgedb:"timeZoneOffset"`
@@ -57,6 +57,16 @@ type BarberShift struct {
 	ActualFrom  edgedb.OptionalDateTime `edgedb:"actualFrom"`
 	ActualTo    edgedb.OptionalDateTime `edgedb:"actualTo"`
 	Deleted     bool                    `edgedb:"deleted"`
+}
+
+type Service struct {
+	edgedb.Optional
+	Barber   Barber          `edgedb:"barber"`
+	Id       edgedb.UUID     `edgedb:"id"`
+	Title    string          `edgedb:"title"`
+	Type     string          `edgedb:"type"`
+	Price    uint64          `edgedb:"price"`
+	Duration edgedb.Duration `edgedb:"duration"`
 }
 
 func (b BarberShift) String() string {
