@@ -26,8 +26,8 @@ func NewDBConfig() *DBConfig {
 	}
 	return &DBConfig{
 		DBName:   os.Getenv("EDGEDB_SERVER_DATABASE"),
-		Host:     "db",
-		User:     os.Getenv("EDGEDB_SERVER_DATABASE"),
+		Host:     os.Getenv("EDGEDB_SERVER_HOST"),
+		User:     os.Getenv("EDGEDB_SERVER_USER"),
 		Password: os.Getenv("EDGEDB_SERVER_PASSWORD"),
 		Port:     port,
 	}
