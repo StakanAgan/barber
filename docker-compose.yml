@@ -23,6 +23,8 @@ services:
       - "5656:5656"
     volumes:
       - ./dbschema:/dbschema
+      - ./credentials:/root/.config/edgedb/credentials
+      - .edgedb.toml:/edgedb.toml
       - ./volumes/edgedb_data:/var/lib/edgedb/data
 
   redis:
