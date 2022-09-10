@@ -3,8 +3,9 @@ package handlers
 import tele "gopkg.in/telebot.v3"
 
 var (
+	BtnShifts          = MainBarberKeyboard.Text("🗓 Смены")
+	BtnServices        = MainBarberKeyboard.Text("🧾 Цены")
 	MainBarberKeyboard = &tele.ReplyMarkup{ResizeKeyboard: true}
-	BtnShifts          = MainBarberKeyboard.Text("🗓 Мои смены")
 
 	BarberShiftsInlineKeyboard = &tele.ReplyMarkup{}
 	BtnAllShifts               = BarberShiftsInlineKeyboard.Data("🗄 Показать все смены", "all")
@@ -14,6 +15,10 @@ var (
 	BtnStartShift              = BarberShiftsInlineKeyboard.Data("✅ Начать смену", "start")
 	BtnFinishShift             = BarberShiftsInlineKeyboard.Data("❎ Закончить смену", "finish")
 	BtnCancelShift             = BarberShiftsInlineKeyboard.Data("🚫 Отменить смену", "canceled")
+
+	BarberServicesInlineKeyboard = &tele.ReplyMarkup{}
+	BtnGetService                = BarberServicesInlineKeyboard.Data("Перейти к сервису", "barberToService")
+	BtnCreateService             = BarberServicesInlineKeyboard.Data("🖋 Добавить услугу", "createService")
 
 	PhoneRequestKeyboard = &tele.ReplyMarkup{ResizeKeyboard: true}
 	BtnRequestPhone      = PhoneRequestKeyboard.Contact("☎️ Поделиться цифрами")

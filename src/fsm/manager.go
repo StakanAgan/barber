@@ -1,6 +1,7 @@
 package fsm
 
 import (
+	"benny/src"
 	"context"
 	"fmt"
 	"github.com/go-redis/redis/v9"
@@ -17,14 +18,13 @@ type Manager struct {
 	client       *redis.Client
 	telegramId   int64
 	stateManager *StateManagerImpl
+	dataManager  *DataManagerImpl
 }
 
+var config = src.NewRedisConfig()
+
 func New(ctx context.Context, telegramId int64) (*Manager, func() error) {
-	client := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "",
-		DB:       0,
-	})
+	client := redis.NewClient(config)
 	return &Manager{ctx: ctx, client: client, telegramId: telegramId}, client.Close
 }
 
@@ -36,6 +36,14 @@ func (m *Manager) State() *StateManagerImpl {
 	return m.stateManager
 }
 
+func (m *Manager) Data() *DataManagerImpl {
+	if m.dataManager == nil {
+		m.dataManager = &DataManagerImpl{ctx: m.ctx, client: m.client, key: fmt.Sprintf(dataKey, m.telegramId)}
+	}
+
+	return m.dataManager
+}
+
 type StateManager interface {
 	Get() State
 	Set(state State) error
@@ -43,6 +51,18 @@ type StateManager interface {
 }
 
 type StateManagerImpl struct {
+	ctx    context.Context
+	client *redis.Client
+	key    string
+}
+
+type DataManager interface {
+	Set(key string, value string) error
+	Get(key string) (value string)
+	Reset()
+}
+
+type DataManagerImpl struct {
 	ctx    context.Context
 	client *redis.Client
 	key    string
@@ -64,4 +84,30 @@ func (s *StateManagerImpl) Set(state State) error {
 
 func (s *StateManagerImpl) Reset() {
 	s.client.Del(s.ctx, s.key)
+}
+
+func (d *DataManagerImpl) Set(key string, value string) error {
+	userDataKey := fmt.Sprintf("%s_%s", d.key, key)
+	return d.client.Set(d.ctx, userDataKey, value, 0).Err()
+}
+
+func (d *DataManagerImpl) Get(key string) (value string) {
+	userDataKey := fmt.Sprintf("%s_%s", d.key, key)
+	value, err := d.client.Get(d.ctx, userDataKey).Result()
+	if err != nil {
+		if err != redis.Nil {
+			log.Fatal(err)
+		}
+	}
+	return value
+}
+
+func (d *DataManagerImpl) Reset() {
+	keys, err := d.client.Keys(d.ctx, d.key).Result()
+	if err != nil {
+		if err != redis.Nil {
+			log.Fatal(err)
+		}
+	}
+	d.client.Del(d.ctx, keys...)
 }

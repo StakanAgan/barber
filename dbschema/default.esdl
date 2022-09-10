@@ -12,7 +12,6 @@ module default {
     };
     multi link visits := .<customer[is Visit]
   }
-  scalar type ServiceType extending enum<Hair, Beard, HairBeard>;
 
   type Barber {
     required property fullName -> str;
@@ -77,10 +76,12 @@ module default {
   type Service {
     required link barber -> Barber;
     required property title -> str;
-    required property type -> ServiceType;
     required property price -> int64{
       constraint min_value(0);
     };
     required property duration -> duration;
+    required property deleted -> bool{
+      default := false;
+    }
   }
 }

@@ -2,6 +2,9 @@ package main
 
 import (
 	"benny/src/handlers"
+	"benny/src/repository"
+	"context"
+	"fmt"
 	"github.com/joho/godotenv"
 	tele "gopkg.in/telebot.v3"
 	"log"
@@ -24,6 +27,17 @@ func main() {
 		return
 	}
 
+	ctx := context.Background()
+	client, closer := repository.NewDBClient(ctx)
+	var result string
+	err = client.QuerySingle(ctx, "SELECT 'EdgeDB connected...'", &result)
+	if err != nil {
+		log.Fatal(fmt.Sprintf("Can't connect to DB, err: %s", err))
+	}
+
+	log.Println(result)
+	closer()
+
 	b.Handle("/start", handlers.HandleStart())
 
 	// barber handlers
@@ -34,6 +48,8 @@ func main() {
 	b.Handle(&handlers.BtnGetShift, handlers.HandleGetShift())
 	b.Handle(&handlers.BtnStartShift, handlers.HandleStartShift())
 	b.Handle(&handlers.BtnFinishShift, handlers.HandleFinishShift())
+	b.Handle(&handlers.BtnServices, handlers.HandleMainServices())
+	b.Handle(&handlers.BtnCreateService, handlers.HandleStartCreateService())
 	b.Handle(tele.OnText, handlers.HandleText())
 
 	// customer handlers

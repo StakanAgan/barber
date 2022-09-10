@@ -5,6 +5,7 @@ import (
 	"context"
 	"github.com/edgedb/edgedb-go"
 	"log"
+	"os"
 )
 
 type Store struct {
@@ -13,22 +14,27 @@ type Store struct {
 	customerRepository *CustomerRepositoryImpl
 	barberRepository   *BarberRepositoryImpl
 	shiftRepository    *ShiftRepositoryImpl
+	serviceRepository  *ServiceRepositoryImpl
 }
 
 var config = src.NewDBConfig()
 
 func NewDBClient(ctx context.Context) (*edgedb.Client, func()) {
-	opts := edgedb.Options{
-		Database: config.DBName,
-		Host:     config.Host,
-		User:     config.User,
-		Password: edgedb.NewOptionalStr(config.Password),
-		Port:     config.Port,
-		TLSOptions: edgedb.TLSOptions{
-			SecurityMode: edgedb.TLSModeInsecure,
-		},
-		Concurrency: 4,
+	opts := edgedb.Options{}
+	if os.Getenv("ENV") != "local" {
+		opts = edgedb.Options{
+			Database: config.DBName,
+			Host:     config.Host,
+			User:     config.User,
+			Password: edgedb.NewOptionalStr(config.Password),
+			Port:     config.Port,
+			TLSOptions: edgedb.TLSOptions{
+				SecurityMode: edgedb.TLSModeInsecure,
+			},
+			Concurrency: 4,
+		}
 	}
+
 	client, err := edgedb.CreateClient(ctx, opts)
 	if err != nil {
 		log.Fatal(err)
@@ -74,4 +80,12 @@ func (s *Store) Customer() CustomerRepository {
 	}
 
 	return s.customerRepository
+}
+
+func (s *Store) Service() ServiceRepository {
+	if s.serviceRepository == nil {
+		s.serviceRepository = &ServiceRepositoryImpl{ctx: s.ctx, client: s.client}
+	}
+
+	return s.serviceRepository
 }

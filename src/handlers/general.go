@@ -25,7 +25,7 @@ func HandleStart() func(c tele.Context) error {
 			MainCustomerKeyboard.Reply(MainCustomerKeyboard.Row(BtnCreateVisit))
 			return c.Send(fmt.Sprintf("Йо, тебя зовут %s, твой id %s", customer.FullName, customer.Id), MainCustomerKeyboard)
 		}
-		MainBarberKeyboard.Reply(MainBarberKeyboard.Row(BtnShifts))
+		MainBarberKeyboard.Reply(MainBarberKeyboard.Row(BtnShifts), MainBarberKeyboard.Row(BtnServices))
 		return c.Send(fmt.Sprintf("Йо, твой тлф %s", barber.Phone), MainBarberKeyboard)
 	}
 }

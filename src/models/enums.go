@@ -9,14 +9,6 @@ const (
 	Canceled              = "Canceled"
 )
 
-type ServiceType string
-
-const (
-	Hair      ServiceType = "Hair"
-	Beard                 = "Beard"
-	HairBeard             = "HairBeard"
-)
-
 type ShiftStatus string
 
 const (

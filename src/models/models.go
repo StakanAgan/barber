@@ -21,8 +21,6 @@ type Visit struct {
 	BarberShift   BarberShift             `edgedb:"barberShift"`
 	Customer      Customer                `edgedb:"customer"`
 	Id            edgedb.UUID             `edgedb:"id"`
-	CustomerId    edgedb.UUID             `edgedb:"customerId"`
-	BarberShiftId edgedb.UUID             `edgedb:"barberShiftId"`
 	PlannedFrom   time.Time               `edgedb:"plannedFrom"`
 	PlannedTo     time.Time               `edgedb:"plannedTo"`
 	ActualFrom    edgedb.OptionalDateTime `edgedb:"actualFrom"`
@@ -49,7 +47,6 @@ type BarberShift struct {
 	edgedb.Optional
 	Barber      Barber                  `edgedb:"barber"`
 	Id          edgedb.UUID             `edgedb:"id"`
-	BarberId    edgedb.UUID             `edgedb:"barberId"`
 	Visits      []Visit                 `edgedb:"visits"`
 	Status      string                  `edgedb:"status"`
 	PlannedFrom time.Time               `edgedb:"plannedFrom"`
@@ -64,8 +61,7 @@ type Service struct {
 	Barber   Barber          `edgedb:"barber"`
 	Id       edgedb.UUID     `edgedb:"id"`
 	Title    string          `edgedb:"title"`
-	Type     string          `edgedb:"type"`
-	Price    uint64          `edgedb:"price"`
+	Price    int64           `edgedb:"price"`
 	Duration edgedb.Duration `edgedb:"duration"`
 }
 
@@ -74,4 +70,8 @@ func (b BarberShift) String() string {
 		b.PlannedFrom.Format("02.01.2006"),
 		b.PlannedFrom.Add(time.Hour*time.Duration(b.Barber.TimeZoneOffset)).Format("15:04"),
 		b.PlannedTo.Add(time.Hour*time.Duration(b.Barber.TimeZoneOffset)).Format("15:04"))
+}
+
+func (s Service) String() string {
+	return fmt.Sprintf("%s - %d минут - %d рублей", s.Title, s.Duration/60_000_000, s.Price)
 }

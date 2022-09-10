@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	fsm2 "benny/src/fsm"
-	models2 "benny/src/models"
+	"benny/src/fsm"
+	"benny/src/models"
 	"benny/src/repository"
 	"benny/src/utils"
 	"context"
@@ -10,6 +10,7 @@ import (
 	"github.com/edgedb/edgedb-go"
 	tele "gopkg.in/telebot.v3"
 	"log"
+	"strconv"
 	"time"
 )
 
@@ -67,7 +68,7 @@ func HandleText() func(c tele.Context) error {
 		store, closer := repository.New(ctx)
 		defer closer()
 
-		stateManager, managerCloser := fsm2.New(ctx, c.Chat().ID)
+		stateManager, managerCloser := fsm.New(ctx, c.Chat().ID)
 		defer managerCloser()
 
 		barber, missing := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
@@ -75,45 +76,63 @@ func HandleText() func(c tele.Context) error {
 			return c.Send("ты кто?")
 		}
 		state := stateManager.State().Get()
-
 		switch state {
-		case fsm2.ShiftEnter:
-			times, err := utils.ParseTimesFromString(c.Text())
+		case fsm.ShiftEnter:
+			err := HandleShiftEnter(store, stateManager, c, barber)
 			if err != nil {
-				return c.Send("Не тот формат, брат. Введи период в формате\n<b>29.08.2022 11:00-19:00</b>", tele.ModeHTML)
+				return err
 			}
-			var dtParseFormat = "02.01.2006T15:04-07"
-			var dtPassFormat = "%sT%s+0%d"
-			plannedFrom, err := time.Parse(dtParseFormat, fmt.Sprintf(dtPassFormat, times.Date, times.TimeFrom, barber.TimeZoneOffset))
-			if err != nil {
-				log.Println(err)
-				return c.Send(fmt.Sprintf("Ошибка где-то здесь <b>%s</b> <b>%s</b>-%s", times.Date, times.TimeFrom, times.TimeTo), tele.ModeHTML)
-			}
-			plannedTo, err := time.Parse(dtParseFormat, fmt.Sprintf(dtPassFormat, times.Date, times.TimeTo, barber.TimeZoneOffset))
-			if err != nil {
-				log.Println(err)
-				return c.Send(fmt.Sprintf("Ошибка где-то здесь <b>%s</b> %s-<b>%s</b>", times.Date, times.TimeFrom, times.TimeTo), tele.ModeHTML)
-			}
-			if plannedFrom.Unix() >= plannedTo.Unix() {
-				return c.Send(fmt.Sprintf("Время указанное от <b>%s</b> позже либо равно времени до <b>%s</b>\n"+
-					"Начало смены должно быть раньше ее конца", times.TimeFrom, times.TimeTo), tele.ModeHTML)
-			}
-
-			var shift = &models2.BarberShift{PlannedFrom: plannedFrom.UTC(), Barber: *barber, PlannedTo: plannedTo.UTC()}
-			shift, err = store.Shift().Create(barber.Id, shift)
-			if err != nil {
-				return c.Send("Брат, эта смена пересекается с другой\nПопробуй еще раз, но так, чтобы не пересекалась", tele.ModeHTML)
-			}
-			err = c.Send("Добавили смену работяге")
-			if err != nil {
-				log.Fatal(err)
-			}
-			stateManager.State().Reset()
 			return HandleMainShifts()(c)
+		case fsm.ServiceEnterTitle:
+			return HandleServiceEnterTitle(stateManager, c)
+		case fsm.ServiceEnterPrice:
+			return HandleServiceEnterPrice(stateManager, c)
+		case fsm.ServiceEnterDuration:
+			err := HandleEndCreateService(store, stateManager, *barber, c)
+			if err != nil {
+				return err
+			}
+			stateManager.Data().Reset()
+			return HandleMainServices()(c)
 		default:
 			return c.Send("Я тебя не понял")
 		}
 	}
+}
+
+func HandleShiftEnter(store *repository.Store, stateManager *fsm.Manager, c tele.Context, barber *models.Barber) error {
+	times, err := utils.ParseTimesFromString(c.Text())
+	if err != nil {
+		return c.Send("Не тот формат, брат. Введи период в формате\n<b>29.08.2022 11:00-19:00</b>", tele.ModeHTML)
+	}
+	var dtParseFormat = "02.01.2006T15:04-07"
+	var dtPassFormat = "%sT%s+0%d"
+	plannedFrom, err := time.Parse(dtParseFormat, fmt.Sprintf(dtPassFormat, times.Date, times.TimeFrom, barber.TimeZoneOffset))
+	if err != nil {
+		log.Println(err)
+		return c.Send(fmt.Sprintf("Ошибка где-то здесь <b>%s</b> <b>%s</b>-%s", times.Date, times.TimeFrom, times.TimeTo), tele.ModeHTML)
+	}
+	plannedTo, err := time.Parse(dtParseFormat, fmt.Sprintf(dtPassFormat, times.Date, times.TimeTo, barber.TimeZoneOffset))
+	if err != nil {
+		log.Println(err)
+		return c.Send(fmt.Sprintf("Ошибка где-то здесь <b>%s</b> %s-<b>%s</b>", times.Date, times.TimeFrom, times.TimeTo), tele.ModeHTML)
+	}
+	if plannedFrom.Unix() >= plannedTo.Unix() {
+		return c.Send(fmt.Sprintf("Время указанное от <b>%s</b> позже либо равно времени до <b>%s</b>\n"+
+			"Начало смены должно быть раньше ее конца", times.TimeFrom, times.TimeTo), tele.ModeHTML)
+	}
+
+	var shift = &models.BarberShift{PlannedFrom: plannedFrom.UTC(), Barber: *barber, PlannedTo: plannedTo.UTC()}
+	shift, err = store.Shift().Create(barber.Id, shift)
+	if err != nil {
+		return c.Send("Брат, эта смена пересекается с другой\nПопробуй еще раз, но так, чтобы не пересекалась", tele.ModeHTML)
+	}
+	err = c.Send("Добавили смену работяге")
+	if err != nil {
+		log.Fatal(err)
+	}
+	stateManager.State().Reset()
+	return err
 }
 
 func HandleStartCreateShift() func(c tele.Context) error {
@@ -122,7 +141,7 @@ func HandleStartCreateShift() func(c tele.Context) error {
 		store, closer := repository.New(ctx)
 		defer closer()
 
-		stateManager, managerCloser := fsm2.New(ctx, c.Chat().ID)
+		stateManager, managerCloser := fsm.New(ctx, c.Chat().ID)
 		defer managerCloser()
 
 		_, missing := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
@@ -134,7 +153,7 @@ func HandleStartCreateShift() func(c tele.Context) error {
 		if tgerr != nil {
 			log.Fatal(tgerr)
 		}
-		err := stateManager.State().Set(fsm2.ShiftEnter)
+		err := stateManager.State().Set(fsm.ShiftEnter)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -167,10 +186,10 @@ func HandleGetShift() func(c tele.Context) error {
 			btnAction tele.Btn
 		)
 		switch shift.Status {
-		case string(models2.Planned):
+		case string(models.Planned):
 			btnAction = BarberShiftsInlineKeyboard.Data("Начать смену", "start", shiftId.String())
 			needBtn = true
-		case string(models2.Work):
+		case string(models.Work):
 			btnAction = BarberShiftsInlineKeyboard.Data("Завершить смену", "finish", shiftId.String())
 			needBtn = true
 		default:
@@ -200,7 +219,7 @@ func HandleStartShift() func(c tele.Context) error {
 		if err != nil {
 			log.Fatal(err)
 		}
-		_, missing = store.Shift().UpdateStatus(*shiftId, models2.Work)
+		_, missing = store.Shift().UpdateStatus(*shiftId, models.Work)
 		return HandleGetShift()(c)
 	}
 }
@@ -221,7 +240,88 @@ func HandleFinishShift() func(c tele.Context) error {
 		if err != nil {
 			log.Fatal(err)
 		}
-		_, missing = store.Shift().UpdateStatus(*shiftId, models2.Finished)
+		_, missing = store.Shift().UpdateStatus(*shiftId, models.Finished)
 		return HandleGetShift()(c)
 	}
+}
+
+func HandleMainServices() func(c tele.Context) error {
+	return func(c tele.Context) error {
+		ctx := context.Background()
+		store, closer := repository.New(ctx)
+		defer closer()
+
+		barber, missing := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
+		if missing == true {
+			log.Println("INFO: Чел как-то нажал не на свою смену")
+			return c.Send("ты кто?")
+		}
+		services, missing := store.Service().GetAll(barber.Id)
+		buttons := make([]tele.Btn, len(services)+1) // количество смен + кнопка для создания смен + кнопка все смены
+		for _, service := range services {
+			var btn = BarberShiftsInlineKeyboard.Data(service.String(), "barberToService", service.Id.String())
+			buttons = append(buttons, btn)
+		}
+		buttons = append(buttons, BtnCreateService)
+		var rows = BarberShiftsInlineKeyboard.Split(1, buttons)
+		BarberShiftsInlineKeyboard.Inline(rows...)
+		return c.Send("Твои прайсы", BarberShiftsInlineKeyboard)
+	}
+}
+
+func HandleStartCreateService() func(c tele.Context) error {
+	return func(c tele.Context) error {
+		ctx := context.Background()
+		stateManager, managerCloser := fsm.New(ctx, c.Chat().ID)
+		defer managerCloser()
+
+		err := c.Send("Введи название услуги")
+		stateManager.State().Set(fsm.ServiceEnterTitle)
+		return err
+	}
+}
+
+func HandleServiceEnterTitle(manager *fsm.Manager, c tele.Context) error {
+	manager.Data().Set("title", c.Text())
+	err := c.Send("Введи стоимость услуги в рублях целым числом\nнапример <b>1000</b>", tele.ModeHTML)
+	manager.State().Set(fsm.ServiceEnterPrice)
+	return err
+}
+
+func HandleServiceEnterPrice(manager *fsm.Manager, c tele.Context) error {
+	price, err := strconv.Atoi(c.Text())
+	if err != nil {
+		return c.Send("Невалидная стоимость. Укажи целое значение, например <b>1000</b>", tele.ModeHTML)
+	}
+	manager.Data().Set("price", strconv.Itoa(price))
+	err = c.Send("Введи продолжительность в минутах одним числом\nнапример <b>60</b>, если услуга длится час\n"+
+		"или <b>90</b>, если услуга займет полтора часа", tele.ModeHTML)
+	manager.State().Set(fsm.ServiceEnterDuration)
+	return err
+}
+
+func HandleEndCreateService(store *repository.Store, manager *fsm.Manager, barber models.Barber, c tele.Context) error {
+	duration, err := strconv.Atoi(c.Text())
+	if err != nil {
+		return c.Send("Невалидная продолжительность. Укажи целое значение,"+
+			"\nнапример <b>60</b>, если услуга длится час,"+
+			"\nили <b>90</b>, если услуга займет полтора часа", tele.ModeHTML)
+	}
+	title := manager.Data().Get("title")
+	priceStr := manager.Data().Get("price")
+	price, _ := strconv.Atoi(priceStr)
+	log.Println(priceStr)
+	log.Println(price)
+	log.Println(time.Minute * time.Duration(duration))
+
+	var service = &models.Service{
+		Title:    title,
+		Price:    int64(price),
+		Duration: edgedb.Duration(time.Minute * time.Duration(duration)),
+	}
+	service = store.Service().Create(barber.Id, service)
+	return c.Send(
+		fmt.Sprintf("Создана услуга\n\n<b>%s</b>\nЦена: <b>%d</b>\nПродолжительность: <b>%d минут</b>", title, price, duration),
+		tele.ModeHTML,
+	)
 }
