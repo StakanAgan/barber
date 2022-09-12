@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"benny/src/models"
 	"errors"
 	"regexp"
 )
@@ -22,4 +23,18 @@ func ParseTimesFromString(stringPeriod string) (times Times, err error) {
 		TimeFrom: matched[2],
 		TimeTo:   matched[3],
 	}, nil
+}
+
+type TimeSlice []models.Visit
+
+func (p TimeSlice) Len() int {
+	return len(p)
+}
+
+func (p TimeSlice) Less(i, j int) bool {
+	return p[i].PlannedFrom.Before(p[j].PlannedFrom)
+}
+
+func (p TimeSlice) Swap(i, j int) {
+	p[i], p[j] = p[j], p[i]
 }

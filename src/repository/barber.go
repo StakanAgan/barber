@@ -11,8 +11,8 @@ import (
 type BarberRepository interface {
 	Create(barber *models.Barber) (*models.Barber, bool)
 	GetByTelegramId(telegramId uint64) (*models.Barber, bool)
-	GetWithShifts(barberId edgedb.UUID) (*models.Barber, bool)
-	GetAllWithShifts() ([]models.Barber, bool)
+	Get(barberId string) (*models.Barber, bool)
+	GetAll() ([]models.Barber, bool)
 }
 
 type BarberRepositoryImpl struct {
@@ -45,9 +45,13 @@ func (r *BarberRepositoryImpl) GetByTelegramId(telegramId uint64) (*models.Barbe
 	return &result, result.Missing()
 }
 
-func (r *BarberRepositoryImpl) GetWithShifts(barberId edgedb.UUID) (*models.Barber, bool) {
+func (r *BarberRepositoryImpl) Get(barberId string) (*models.Barber, bool) {
 	var barber models.Barber
-	var query = fmt.Sprintf("select Barber{id, fullName, phone, telegramId, timeZoneOffset, shifts: {id, barber: {timeZoneOffset}, plannedFrom, plannedTo, status} filter .status in {ShiftStatus.Planned, ShiftStatus.Work}} filter .id = <uuid>'%s';", barberId)
+	var query = fmt.Sprintf("select Barber{"+
+		"id, fullName, phone, telegramId, timeZoneOffset,"+
+		" services: {id, title, price, duration},"+
+		" shifts: {id, barber: {timeZoneOffset}, plannedFrom, plannedTo, status}"+
+		"} filter .id = <uuid>'%s';", barberId)
 	err := r.client.QuerySingle(r.ctx, query, &barber)
 	if err != nil {
 		log.Fatal(err)
@@ -55,9 +59,13 @@ func (r *BarberRepositoryImpl) GetWithShifts(barberId edgedb.UUID) (*models.Barb
 	return &barber, barber.Missing()
 }
 
-func (r *BarberRepositoryImpl) GetAllWithShifts() ([]models.Barber, bool) {
+func (r *BarberRepositoryImpl) GetAll() ([]models.Barber, bool) {
 	var barbers []models.Barber
-	var query = "select Barber{id, fullName, phone, timeZoneOffset} filter count(.shifts filter .status = ShiftStatus.Planned or .status = ShiftStatus.Work) > 0;"
+	var query = "select Barber{" +
+		"id, fullName, phone, timeZoneOffset" +
+		"}" +
+		" filter count(.shifts filter .status = ShiftStatus.Planned or .status = ShiftStatus.Work) > 0" +
+		" and count(.services filter .deleted = false) > 0;"
 	err := r.client.Query(r.ctx, query, &barbers)
 	if err != nil {
 		log.Fatal(err)

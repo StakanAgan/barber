@@ -56,6 +56,9 @@ func main() {
 	b.Handle(tele.OnContact, handlers.HandleReceivePhone())
 	b.Handle(&handlers.BtnCreateVisit, handlers.HandleStartCreateVisit())
 	b.Handle(&handlers.BtnSelectBarber, handlers.HandleSelectBarber())
+	b.Handle(&handlers.BtnSelectService, handlers.HandleSelectService())
+	b.Handle(&handlers.BtnSelectShiftToVisit, handlers.HandleSelectShift())
+	b.Handle(&handlers.BtnSelectTimeToVisit, handlers.HandleSelectTime())
 
 	log.Println("INFO: Bot started...")
 	b.Start()

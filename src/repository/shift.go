@@ -11,12 +11,12 @@ import (
 )
 
 type ShiftRepository interface {
-	Create(barberId edgedb.UUID, shift *models.BarberShift) (*models.BarberShift, error)
-	GetAll(barberId edgedb.UUID) ([]models.BarberShift, bool)
-	GetActual(barberId edgedb.UUID) ([]models.BarberShift, bool)
-	Get(shiftId edgedb.UUID) (models.BarberShift, bool)
-	Delete(shiftId edgedb.UUID) bool
-	UpdateStatus(shiftId edgedb.UUID, status models.ShiftStatus) (models.BarberShift, bool)
+	Create(barberId string, shift *models.BarberShift) (*models.BarberShift, error)
+	GetAll(barberId string) ([]models.BarberShift, bool)
+	GetActual(barberId string) ([]models.BarberShift, bool)
+	Get(shiftId string) (models.BarberShift, bool)
+	Delete(shiftId string) bool
+	UpdateStatus(shiftId string, status models.ShiftStatus) (models.BarberShift, bool)
 }
 
 type ShiftRepositoryImpl struct {
@@ -24,11 +24,7 @@ type ShiftRepositoryImpl struct {
 	client *edgedb.Client
 }
 
-func (r *ShiftRepositoryImpl) Create(barberId edgedb.UUID, shift *models.BarberShift) (*models.BarberShift, error) {
-	ctx := context.Background()
-	client, closer := NewDBClient(ctx)
-	defer closer()
-
+func (r *ShiftRepositoryImpl) Create(barberId string, shift *models.BarberShift) (*models.BarberShift, error) {
 	plannedFromStr := shift.PlannedFrom.Format(time.RFC3339)
 	plannedToStr := shift.PlannedTo.Format(time.RFC3339)
 	var isShiftCrossing bool
@@ -38,7 +34,7 @@ func (r *ShiftRepositoryImpl) Create(barberId edgedb.UUID, shift *models.BarberS
 		" and (.plannedFrom >= <datetime>'%s' and .plannedFrom <= <datetime>'%s')"+
 		" or (.plannedTo >= <datetime>'%s' and .plannedTo <= <datetime>'%s'))",
 		barberId, plannedFromStr, plannedToStr, plannedFromStr, plannedToStr)
-	err := client.QuerySingle(ctx, validateQuery, &isShiftCrossing)
+	err := r.client.QuerySingle(r.ctx, validateQuery, &isShiftCrossing)
 	if isShiftCrossing == true {
 		return shift, errors.New("shift will crossing with another shifts")
 	}
@@ -48,7 +44,7 @@ func (r *ShiftRepositoryImpl) Create(barberId edgedb.UUID, shift *models.BarberS
 		"plannedFrom := <datetime>'%s',"+
 		"plannedTo := <datetime>'%s',"+
 		"};", barberId, plannedFromStr, plannedToStr)
-	err = client.QuerySingle(ctx, query, shift)
+	err = r.client.QuerySingle(r.ctx, query, shift)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -56,13 +52,10 @@ func (r *ShiftRepositoryImpl) Create(barberId edgedb.UUID, shift *models.BarberS
 	return shift, nil
 }
 
-func (r *ShiftRepositoryImpl) GetAll(barberId edgedb.UUID) ([]models.BarberShift, bool) {
-	ctx := context.Background()
-	client, closer := NewDBClient(ctx)
-	defer closer()
+func (r *ShiftRepositoryImpl) GetAll(barberId string) ([]models.BarberShift, bool) {
 	var shifts []models.BarberShift
 	var query = fmt.Sprintf("select BarberShift{id, barber: {fullName, timeZoneOffset}, plannedFrom, plannedTo} filter .barber.id = <uuid>'%s';", barberId)
-	err := client.Query(ctx, query, &shifts)
+	err := r.client.Query(r.ctx, query, &shifts)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -70,16 +63,13 @@ func (r *ShiftRepositoryImpl) GetAll(barberId edgedb.UUID) ([]models.BarberShift
 	return shifts, len(shifts) == 0
 }
 
-func (r *ShiftRepositoryImpl) GetActual(barberId edgedb.UUID) ([]models.BarberShift, bool) {
-	ctx := context.Background()
-	client, closer := NewDBClient(ctx)
-	defer closer()
+func (r *ShiftRepositoryImpl) GetActual(barberId string) ([]models.BarberShift, bool) {
 	var shifts []models.BarberShift
 	var query = fmt.Sprintf("select BarberShift "+
 		"{id, barber: {fullName, timeZoneOffset}, plannedFrom, plannedTo}"+
 		" filter .barber.id = <uuid>'%s'"+
 		" and .status = ShiftStatus.%s or .status = ShiftStatus.%s;", barberId, models.Planned, models.Work)
-	err := client.Query(ctx, query, &shifts)
+	err := r.client.Query(r.ctx, query, &shifts)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -87,16 +77,15 @@ func (r *ShiftRepositoryImpl) GetActual(barberId edgedb.UUID) ([]models.BarberSh
 	return shifts, len(shifts) == 0
 }
 
-func (r *ShiftRepositoryImpl) Get(shiftId edgedb.UUID) (models.BarberShift, bool) {
-	ctx := context.Background()
-	client, closer := NewDBClient(ctx)
-	defer closer()
+func (r *ShiftRepositoryImpl) Get(shiftId string) (models.BarberShift, bool) {
 	var shift models.BarberShift
 	var query = fmt.Sprintf("select BarberShift{"+
-		"id, barber: {fullName, timeZoneOffset}, status, plannedFrom, plannedTo, actualFrom, actualTo, visits: {"+
-		"customer: {fullName, phone}}}"+
-		" filter .id = <uuid>'%s';", shiftId)
-	err := client.QuerySingle(ctx, query, &shift)
+		"id, barber: {fullName, timeZoneOffset},"+
+		" status, plannedFrom, plannedTo, actualFrom, actualTo, visits: {"+
+		"customer: {fullName, phone}, plannedFrom, plannedTo"+
+		"}"+
+		"} filter .id = <uuid>'%s';", shiftId)
+	err := r.client.QuerySingle(r.ctx, query, &shift)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -104,28 +93,21 @@ func (r *ShiftRepositoryImpl) Get(shiftId edgedb.UUID) (models.BarberShift, bool
 
 }
 
-func (r *ShiftRepositoryImpl) Delete(shiftId edgedb.UUID) bool {
-	ctx := context.Background()
-	client, closer := NewDBClient(ctx)
-	defer closer()
+func (r *ShiftRepositoryImpl) Delete(shiftId string) bool {
 	var shift models.BarberShift
 
 	var query = fmt.Sprintf("update BarberShift filter .id=<uuid>'%s' set {deleted := true};", shiftId)
-	err := client.QuerySingle(ctx, query, &shift)
+	err := r.client.QuerySingle(r.ctx, query, &shift)
 	if err != nil {
 		log.Fatal(err)
 	}
 	return shift.Missing()
 }
 
-func (r *ShiftRepositoryImpl) UpdateStatus(shiftId edgedb.UUID, status models.ShiftStatus) (models.BarberShift, bool) {
-	ctx := context.Background()
-	client, closer := NewDBClient(ctx)
-	defer closer()
-
+func (r *ShiftRepositoryImpl) UpdateStatus(shiftId string, status models.ShiftStatus) (models.BarberShift, bool) {
 	var query = fmt.Sprintf("update BarberShift filter .id=<uuid>'%s' set {status := ShiftStatus.%s}", shiftId, status)
 	var shift models.BarberShift
-	err := client.QuerySingle(ctx, query, &shift)
+	err := r.client.QuerySingle(r.ctx, query, &shift)
 	if err != nil {
 		log.Fatal(err)
 	}

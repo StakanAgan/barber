@@ -28,5 +28,9 @@ var (
 
 	CustomerShiftsInlineKeyboard = &tele.ReplyMarkup{}
 	BtnSelectBarber              = CustomerShiftsInlineKeyboard.Data("Выбрать барбера", "customerToBarber")
+	BtnSelectService             = CustomerShiftsInlineKeyboard.Data("Выбрать услугу", "customerToService")
 	BtnSelectShiftToVisit        = CustomerShiftsInlineKeyboard.Data("Перейти к смене", "customerToShift")
+	BtnSelectTimeToVisit         = CustomerShiftsInlineKeyboard.Data("Выбрать время", "customerToTime")
+	BtnDeclineVisit              = CustomerShiftsInlineKeyboard.Data("❌", "customerDeclineVisit")
+	BtnAcceptVisit               = CustomerShiftsInlineKeyboard.Data("✅", "customerAcceptVisit")
 )

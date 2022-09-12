@@ -9,8 +9,9 @@ import (
 )
 
 type ServiceRepository interface {
-	Create(barberId edgedb.UUID, service *models.Service) *models.Service
-	GetAll(barberId edgedb.UUID) ([]models.Service, bool)
+	Create(barberId string, service *models.Service) *models.Service
+	GetAll(barberId string) ([]models.Service, bool)
+	Get(serviceId string) (models.Service, bool)
 	//Update(barberId edgedb.UUID, service *models.Service) *models.Service
 	//Delete(barberId edgedb.UUID, serviceId edgedb.UUID) error
 }
@@ -20,10 +21,7 @@ type ServiceRepositoryImpl struct {
 	client *edgedb.Client
 }
 
-func (r *ServiceRepositoryImpl) Create(barberId edgedb.UUID, service *models.Service) *models.Service {
-	ctx := context.Background()
-	client, closer := NewDBClient(ctx)
-	defer closer()
+func (r *ServiceRepositoryImpl) Create(barberId string, service *models.Service) *models.Service {
 	var query = fmt.Sprintf(
 		"with barberId := <uuid>'%s'"+
 			" insert Service{"+
@@ -34,23 +32,29 @@ func (r *ServiceRepositoryImpl) Create(barberId edgedb.UUID, service *models.Ser
 			"}",
 		barberId, service.Title, service.Price, service.Duration/60_000_000_000,
 	)
-	err := client.QuerySingle(ctx, query, service)
+	err := r.client.QuerySingle(r.ctx, query, service)
 	if err != nil {
 		log.Fatal(err)
 	}
 	return service
 }
 
-func (r *ServiceRepositoryImpl) GetAll(barberId edgedb.UUID) ([]models.Service, bool) {
-	ctx := context.Background()
-	client, closer := NewDBClient(ctx)
-	defer closer()
-
+func (r *ServiceRepositoryImpl) GetAll(barberId string) ([]models.Service, bool) {
 	var query = fmt.Sprintf("select Service{id, title, price, duration} filter .barber.id = <uuid>'%s'", barberId)
 	var services []models.Service
-	err := client.Query(ctx, query, &services)
+	err := r.client.Query(r.ctx, query, &services)
 	if err != nil {
 		log.Fatal(err)
 	}
 	return services, len(services) == 0
+}
+
+func (r *ServiceRepositoryImpl) Get(serviceId string) (models.Service, bool) {
+	var query = fmt.Sprintf("select Service{id, title, price, duration} filter .id = <uuid>'%s'", serviceId)
+	var service models.Service
+	err := r.client.QuerySingle(r.ctx, query, &service)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return service, service.Missing()
 }

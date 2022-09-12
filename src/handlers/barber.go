@@ -24,7 +24,7 @@ func HandleMainShifts() func(c tele.Context) error {
 		if missing == true {
 			log.Printf("INFO: Customer %d try to get shifts", uint64(c.Chat().ID))
 		}
-		shifts, _ := store.Shift().GetActual(barber.Id)
+		shifts, _ := store.Shift().GetActual(barber.Id.String())
 		buttons := make([]tele.Btn, len(shifts)+2) // количество смен + кнопка для создания смен + кнопка все смены
 		buttons = append(buttons, BtnAllShifts)
 		for _, shift := range shifts {
@@ -48,7 +48,7 @@ func HandleAllShifts() func(c tele.Context) error {
 		if missing == true {
 			log.Printf("INFO: Customer %d try to get shifts", uint64(c.Chat().ID))
 		}
-		shifts, _ := store.Shift().GetAll(barber.Id)
+		shifts, _ := store.Shift().GetAll(barber.Id.String())
 		buttons := make([]tele.Btn, len(shifts)+2) // количество смен + кнопка для создания смен + кнопка все смены
 		buttons = append(buttons, BtnPlannedShifts)
 		for _, shift := range shifts {
@@ -123,7 +123,7 @@ func HandleShiftEnter(store *repository.Store, stateManager *fsm.Manager, c tele
 	}
 
 	var shift = &models.BarberShift{PlannedFrom: plannedFrom.UTC(), Barber: *barber, PlannedTo: plannedTo.UTC()}
-	shift, err = store.Shift().Create(barber.Id, shift)
+	shift, err = store.Shift().Create(barber.Id.String(), shift)
 	if err != nil {
 		return c.Send("Брат, эта смена пересекается с другой\nПопробуй еще раз, но так, чтобы не пересекалась", tele.ModeHTML)
 	}
@@ -172,12 +172,8 @@ func HandleGetShift() func(c tele.Context) error {
 			log.Println("INFO: Чел как-то нажал не на свою смену")
 			return c.Send("ты кто?")
 		}
-		shiftId := &edgedb.UUID{}
-		err := shiftId.UnmarshalText([]byte(c.Callback().Data))
-		if err != nil {
-			log.Fatal(err)
-		}
-		shift, missing := store.Shift().Get(*shiftId)
+		shiftId := c.Callback().Data
+		shift, missing := store.Shift().Get(shiftId)
 		if missing == true {
 			return c.Send("Не та смена")
 		}
@@ -187,10 +183,10 @@ func HandleGetShift() func(c tele.Context) error {
 		)
 		switch shift.Status {
 		case string(models.Planned):
-			btnAction = BarberShiftsInlineKeyboard.Data("Начать смену", "start", shiftId.String())
+			btnAction = BarberShiftsInlineKeyboard.Data("Начать смену", "start", shiftId)
 			needBtn = true
 		case string(models.Work):
-			btnAction = BarberShiftsInlineKeyboard.Data("Завершить смену", "finish", shiftId.String())
+			btnAction = BarberShiftsInlineKeyboard.Data("Завершить смену", "finish", shiftId)
 			needBtn = true
 		default:
 			needBtn = false
@@ -214,12 +210,8 @@ func HandleStartShift() func(c tele.Context) error {
 			log.Println("INFO: Чел как-то нажал не на свою смену")
 			return c.Send("ты кто?")
 		}
-		shiftId := &edgedb.UUID{}
-		err := shiftId.UnmarshalText([]byte(c.Callback().Data))
-		if err != nil {
-			log.Fatal(err)
-		}
-		_, missing = store.Shift().UpdateStatus(*shiftId, models.Work)
+		shiftId := c.Callback().Data
+		_, missing = store.Shift().UpdateStatus(shiftId, models.Work)
 		return HandleGetShift()(c)
 	}
 }
@@ -235,12 +227,8 @@ func HandleFinishShift() func(c tele.Context) error {
 			log.Println("INFO: Чел как-то нажал не на свою смену")
 			return c.Send("ты кто?")
 		}
-		shiftId := &edgedb.UUID{}
-		err := shiftId.UnmarshalText([]byte(c.Callback().Data))
-		if err != nil {
-			log.Fatal(err)
-		}
-		_, missing = store.Shift().UpdateStatus(*shiftId, models.Finished)
+		shiftId := c.Callback().Data
+		_, missing = store.Shift().UpdateStatus(shiftId, models.Finished)
 		return HandleGetShift()(c)
 	}
 }
@@ -256,7 +244,7 @@ func HandleMainServices() func(c tele.Context) error {
 			log.Println("INFO: Чел как-то нажал не на свою смену")
 			return c.Send("ты кто?")
 		}
-		services, missing := store.Service().GetAll(barber.Id)
+		services, missing := store.Service().GetAll(barber.Id.String())
 		buttons := make([]tele.Btn, len(services)+1) // количество смен + кнопка для создания смен + кнопка все смены
 		for _, service := range services {
 			var btn = BarberShiftsInlineKeyboard.Data(service.String(), "barberToService", service.Id.String())
@@ -319,7 +307,7 @@ func HandleEndCreateService(store *repository.Store, manager *fsm.Manager, barbe
 		Price:    int64(price),
 		Duration: edgedb.Duration(time.Minute * time.Duration(duration)),
 	}
-	service = store.Service().Create(barber.Id, service)
+	service = store.Service().Create(barber.Id.String(), service)
 	return c.Send(
 		fmt.Sprintf("Создана услуга\n\n<b>%s</b>\nЦена: <b>%d</b>\nПродолжительность: <b>%d минут</b>", title, price, duration),
 		tele.ModeHTML,
