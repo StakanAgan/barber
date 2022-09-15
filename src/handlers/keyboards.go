@@ -24,7 +24,7 @@ var (
 	BtnRequestPhone      = PhoneRequestKeyboard.Contact("☎️ Поделиться цифрами")
 
 	MainCustomerKeyboard = &tele.ReplyMarkup{ResizeKeyboard: true}
-	BtnCreateVisit       = MainCustomerKeyboard.Text("Записаться на стригу")
+	BtnCreateVisit       = MainCustomerKeyboard.Data("Записаться на стригу", "createVisit")
 
 	CustomerShiftsInlineKeyboard = &tele.ReplyMarkup{}
 	BtnSelectBarber              = CustomerShiftsInlineKeyboard.Data("Выбрать барбера", "customerToBarber")

@@ -12,6 +12,7 @@ type BarberRepository interface {
 	Create(barber *models.Barber) (*models.Barber, bool)
 	GetByTelegramId(telegramId uint64) (*models.Barber, bool)
 	Get(barberId string) (*models.Barber, bool)
+	GetFirst() (*models.Barber, bool)
 	GetAll() ([]models.Barber, bool)
 }
 
@@ -52,6 +53,20 @@ func (r *BarberRepositoryImpl) Get(barberId string) (*models.Barber, bool) {
 		" services: {id, title, price, duration},"+
 		" shifts: {id, barber: {timeZoneOffset}, plannedFrom, plannedTo, status}"+
 		"} filter .id = <uuid>'%s';", barberId)
+	err := r.client.QuerySingle(r.ctx, query, &barber)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return &barber, barber.Missing()
+}
+
+func (r *BarberRepositoryImpl) GetFirst() (*models.Barber, bool) {
+	var barber models.Barber
+	var query = "select Barber{" +
+		"id, fullName, phone, telegramId, timeZoneOffset," +
+		" services: {id, title, price, duration}," +
+		" shifts: {id, barber: {timeZoneOffset}, plannedFrom, plannedTo, status}" +
+		"} limit 1;"
 	err := r.client.QuerySingle(r.ctx, query, &barber)
 	if err != nil {
 		log.Fatal(err)

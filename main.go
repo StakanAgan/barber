@@ -57,11 +57,12 @@ func main() {
 	// customer handlers
 	b.Handle(tele.OnContact, tele.HandlerFunc(handlers.HandleReceivePhone()))
 	b.Handle(&handlers.BtnCreateVisit, tele.HandlerFunc(handlers.HandleStartCreateVisit()))
-	b.Handle(&handlers.BtnSelectBarber, tele.HandlerFunc(handlers.HandleSelectBarber()))
+	//b.Handle(&handlers.BtnSelectBarber, tele.HandlerFunc(handlers.HandleSelectBarber()))
 	b.Handle(&handlers.BtnSelectService, tele.HandlerFunc(handlers.HandleSelectService()))
 	b.Handle(&handlers.BtnSelectShiftToVisit, tele.HandlerFunc(handlers.HandleSelectShift()))
 	b.Handle(&handlers.BtnSelectTimeToVisit, tele.HandlerFunc(handlers.HandleSelectTime()))
 	b.Handle(&handlers.BtnAcceptVisit, tele.HandlerFunc(handlers.HandleAcceptVisit()))
+	b.Handle(&handlers.BtnDeclineVisit, tele.HandlerFunc(handlers.HandleDeclineVisit()))
 
 	log.Println("INFO: Bot started...")
 	b.Start()

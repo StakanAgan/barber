@@ -27,38 +27,39 @@ func HandleReceivePhone() Handler {
 			TelegramId: uint64(c.Chat().ID),
 		}
 		customer = store.Customer().Create(customer)
-		MainCustomerKeyboard.Reply(MainBarberKeyboard.Row(BtnCreateVisit))
-		return c.Send(fmt.Sprintf("Велком, %s\n\nЕсли хочешь записаться на стригу, нажми на кнопку внизу", customer.FullName), MainCustomerKeyboard)
+		MainCustomerKeyboard.Inline(MainBarberKeyboard.Row(BtnCreateVisit))
+		return c.Send(fmt.Sprintf("Велком, %s", customer.FullName), MainCustomerKeyboard)
 	}
 }
+
+//
+//func HandleStartCreateVisit() Handler {
+//	return func(c tele.Context) error {
+//		ctx := context.Background()
+//		store, closer := repository.New(ctx)
+//		defer closer()
+//
+//		_, missing := store.Customer().GetByTelegramId(c.Chat().ID)
+//		if missing == true {
+//			log.Printf("WARN: Пользователь: %d %s нажал кнопку записаться, но не был залогинен", c.Chat().ID, c.Chat().Username)
+//			return c.Send("wtf")
+//		}
+//		barbers, missing := store.Barber().GetAll()
+//		if missing == true {
+//			return c.Send("Не нашлось парикмахеров")
+//		}
+//		buttons := make([]tele.Btn, len(barbers))
+//		for _, barber := range barbers {
+//			var btn = BarberShiftsInlineKeyboard.Data(fmt.Sprintf("%s", barber.FullName), "customerToBarber", barber.Id.String())
+//			buttons = append(buttons, btn)
+//		}
+//		var rows = BarberShiftsInlineKeyboard.Split(1, buttons)
+//		BarberShiftsInlineKeyboard.Inline(rows...)
+//		return c.Send("Барберы", BarberShiftsInlineKeyboard)
+//	}
+//}
 
 func HandleStartCreateVisit() Handler {
-	return func(c tele.Context) error {
-		ctx := context.Background()
-		store, closer := repository.New(ctx)
-		defer closer()
-
-		_, missing := store.Customer().GetByTelegramId(c.Chat().ID)
-		if missing == true {
-			log.Printf("WARN: Пользователь: %d %s нажал кнопку записаться, но не был залогинен", c.Chat().ID, c.Chat().Username)
-			return c.Send("wtf")
-		}
-		barbers, missing := store.Barber().GetAll()
-		if missing == true {
-			return c.Send("Не нашлось парикмахеров")
-		}
-		buttons := make([]tele.Btn, len(barbers))
-		for _, barber := range barbers {
-			var btn = BarberShiftsInlineKeyboard.Data(fmt.Sprintf("%s", barber.FullName), "customerToBarber", barber.Id.String())
-			buttons = append(buttons, btn)
-		}
-		var rows = BarberShiftsInlineKeyboard.Split(1, buttons)
-		BarberShiftsInlineKeyboard.Inline(rows...)
-		return c.Send("Барберы", BarberShiftsInlineKeyboard)
-	}
-}
-
-func HandleSelectBarber() Handler {
 	return func(c tele.Context) error {
 		ctx := context.Background()
 		store, closer := repository.New(ctx)
@@ -72,12 +73,12 @@ func HandleSelectBarber() Handler {
 			log.Printf("WARN: Пользователь: %d %s нажал кнопку записаться, но не был залогинен", c.Chat().ID, c.Chat().Username)
 			return c.Send("wtf")
 		}
-		barberId := c.Callback().Data
-		barber, missing := store.Barber().Get(barberId)
+		//barberId := c.Callback().Data
+		barber, missing := store.Barber().GetFirst()
 		if missing == true {
 			return c.Send("Не найден такой барбер")
 		}
-		stateManager.Data().Set("barberId", c.Callback().Data)
+		stateManager.Data().Set("barberId", barber.Id.String())
 		services, _ := store.Service().GetAll(barber.Id.String())
 		buttons := make([]tele.Btn, len(services))
 		for _, service := range services {
@@ -225,6 +226,7 @@ func HandleAcceptVisit() Handler {
 		stateManager, managerCloser := fsm.New(ctx, c.Chat().ID)
 		defer managerCloser()
 		defer stateManager.Data().Reset()
+		defer c.Bot().EditReplyMarkup(c.Message(), nil)
 
 		barberId := stateManager.Data().Get("barberId")
 		serviceId := stateManager.Data().Get("serviceId")
@@ -254,13 +256,30 @@ func HandleAcceptVisit() Handler {
 		}
 		visit, err := store.Visit().Create(visit)
 		if err != nil {
-			return c.Send("Кто-то записался раньше тебя. Попробуй на другое время")
+			MainCustomerKeyboard.Inline(MainCustomerKeyboard.Row(BtnCreateVisit))
+			return c.Send("Кто-то записался раньше тебя. Попробуй на другое время", MainCustomerKeyboard)
 		}
 		err = notifications.NotifyBarberAboutCreated(c.Bot(), barber.TelegramId, *visit)
 		if err != nil {
-			log.Fatal(err)
+			c.Send("Бен пока не получил уведомление, но зайдет и прочитает")
+			log.Println("WARN: Not found Benny telegramId")
 		}
+		MainCustomerKeyboard.Inline(MainCustomerKeyboard.Row(BtnCreateVisit))
 
-		return c.Send("Записано")
+		return c.Send("Записано", MainCustomerKeyboard)
+	}
+}
+
+func HandleDeclineVisit() Handler {
+	return func(c tele.Context) error {
+		ctx := context.Background()
+
+		stateManager, managerCloser := fsm.New(ctx, c.Chat().ID)
+		defer managerCloser()
+		defer stateManager.Data().Reset()
+		defer c.Bot().EditReplyMarkup(c.Message(), nil)
+		MainCustomerKeyboard.Inline(MainCustomerKeyboard.Row(BtnCreateVisit))
+
+		return c.Send("Запись отменена", MainCustomerKeyboard)
 	}
 }

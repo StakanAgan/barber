@@ -24,8 +24,8 @@ func HandleStart() Handler {
 				PhoneRequestKeyboard.Reply(PhoneRequestKeyboard.Row(BtnRequestPhone))
 				return c.Send("Заделись цифрами, чтобы записаться на стригу. Просто нажми на <b>☎️ Поделиться цифрами</b> внизу 👇🏼", PhoneRequestKeyboard, tele.ModeHTML)
 			}
-			MainCustomerKeyboard.Reply(MainCustomerKeyboard.Row(BtnCreateVisit))
-			return c.Send(fmt.Sprintf("Велком, %s\n\nЕсли хочешь записаться на стригу, нажми на кнопку внизу", customer.FullName), MainCustomerKeyboard)
+			MainCustomerKeyboard.Inline(MainCustomerKeyboard.Row(BtnCreateVisit))
+			return c.Send(fmt.Sprintf("Велком, %s", customer.FullName), MainCustomerKeyboard)
 		}
 		MainBarberKeyboard.Reply(MainBarberKeyboard.Row(BtnShifts), MainBarberKeyboard.Row(BtnServices))
 		return c.Send(fmt.Sprintf("Йо, твой тлф %s", barber.Phone), MainBarberKeyboard)
