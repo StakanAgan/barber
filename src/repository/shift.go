@@ -67,7 +67,7 @@ func (r *ShiftRepositoryImpl) GetActual(barberId string) ([]models.BarberShift, 
 	var shifts []models.BarberShift
 	var query = fmt.Sprintf("select BarberShift "+
 		"{id, barber: {fullName, timeZoneOffset}, plannedFrom, plannedTo}"+
-		" filter .barber.id = <uuid>'%s'"+
+		" filter .barber.id = <uuid>'%s' and .plannedTo > datetime_current()"+
 		" and .status = ShiftStatus.%s or .status = ShiftStatus.%s;", barberId, models.Planned, models.Work)
 	err := r.client.Query(r.ctx, query, &shifts)
 	if err != nil {

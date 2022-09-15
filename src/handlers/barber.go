@@ -103,8 +103,10 @@ func HandleText() Handler {
 
 func HandleShiftEnter(store *repository.Store, stateManager *fsm.Manager, c tele.Context, barber *models.Barber) error {
 	times, err := utils.ParseTimesFromString(c.Text())
+	now := time.Now()
+
 	if err != nil {
-		return c.Send("Не тот формат, брат. Введи период в формате\n<b>29.08.2022 11:00-19:00</b>", tele.ModeHTML)
+		return c.Send(fmt.Sprintf("Не тот формат, брат. Введи период в формате\n<b>%s 11:00-19:00</b>", now.Format("02.01.2006")), tele.ModeHTML)
 	}
 	var dtParseFormat = "02.01.2006T15:04-07"
 	var dtPassFormat = "%sT%s+0%d"
@@ -150,7 +152,8 @@ func HandleStartCreateShift() Handler {
 			log.Println("INFO: Чел как-то нажал кнопку создать смену")
 			return c.Send("ты кто?")
 		}
-		tgerr := c.Send("Напиши дату смены и со скольких до скольких в формате:\n<b>29.08.2022 11:00-19:00</b>", tele.ModeHTML)
+		now := time.Now()
+		tgerr := c.Send(fmt.Sprintf("Напиши дату смены и со скольких до скольких в формате:\n<b>%s 11:00-19:00</b>", now.Format("02.01.2006")), tele.ModeHTML)
 		if tgerr != nil {
 			log.Fatal(tgerr)
 		}

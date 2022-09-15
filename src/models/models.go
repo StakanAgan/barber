@@ -66,10 +66,11 @@ type Service struct {
 }
 
 func (b BarberShift) String() string {
+	timeOffset := time.Hour * time.Duration(b.Barber.TimeZoneOffset)
 	return fmt.Sprintf("%s %s до %s",
-		b.PlannedFrom.Format("02.01.2006"),
-		b.PlannedFrom.Add(time.Hour*time.Duration(b.Barber.TimeZoneOffset)).Format("15:04"),
-		b.PlannedTo.Add(time.Hour*time.Duration(b.Barber.TimeZoneOffset)).Format("15:04"))
+		b.PlannedFrom.Add(timeOffset).Format("02.01.2006"),
+		b.PlannedFrom.Add(timeOffset).Format("15:04"),
+		b.PlannedTo.Add(timeOffset).Format("15:04"))
 }
 
 func (s Service) String() string {

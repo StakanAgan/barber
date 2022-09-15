@@ -9,7 +9,7 @@ var (
 
 	BarberShiftsInlineKeyboard = &tele.ReplyMarkup{}
 	BtnAllShifts               = BarberShiftsInlineKeyboard.Data("🗄 Показать все смены", "all")
-	BtnPlannedShifts           = BarberShiftsInlineKeyboard.Data("📖 Показать только запланированные", "planned")
+	BtnPlannedShifts           = BarberShiftsInlineKeyboard.Data("📖 Показать только актуальные", "planned")
 	BtnCreateShift             = BarberShiftsInlineKeyboard.Data("📆 Создать смену", "create")
 	BtnGetShift                = BarberShiftsInlineKeyboard.Data("Перейти к смене", "barberToShift")
 	BtnStartShift              = BarberShiftsInlineKeyboard.Data("✅ Начать смену", "start")

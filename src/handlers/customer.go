@@ -79,6 +79,10 @@ func HandleStartCreateVisit() Handler {
 			return c.Send("Не найден такой барбер")
 		}
 		stateManager.Data().Set("barberId", barber.Id.String())
+		_, missing = store.Shift().GetActual(barber.Id.String())
+		if missing == true {
+			return c.Send("У Бена нет актуальных смен")
+		}
 		services, _ := store.Service().GetAll(barber.Id.String())
 		buttons := make([]tele.Btn, len(services))
 		for _, service := range services {
@@ -110,9 +114,13 @@ func HandleSelectService() Handler {
 		if missing == true {
 			return c.Send("Не найден такой барбер")
 		}
-		buttons := make([]tele.Btn, len(barber.Shifts))
-		for _, service := range barber.Shifts {
-			var btn = BarberShiftsInlineKeyboard.Data(service.String(), "customerToShift", service.Id.String())
+		shifts, missing := store.Shift().GetActual(barberId)
+		if missing == true {
+			return c.Send("У Бена нет актуальных смен")
+		}
+		buttons := make([]tele.Btn, len(shifts))
+		for _, shift := range shifts {
+			var btn = BarberShiftsInlineKeyboard.Data(shift.String(), "customerToShift", shift.Id.String())
 			buttons = append(buttons, btn)
 		}
 		var rows = BarberShiftsInlineKeyboard.Split(1, buttons)
@@ -147,7 +155,12 @@ func HandleSelectShift() Handler {
 			closedHours[visit.PlannedFrom] = visit.PlannedTo
 		}
 		openHours := make(map[time.Time]models.Visit)
-		for startOfVisit := shift.PlannedFrom; startOfVisit.After(shift.PlannedTo) == false; startOfVisit = startOfVisit.Add(time.Duration(1) * time.Hour) {
+		startOfOpenHours := shift.PlannedFrom
+		if time.Now().UTC().After(startOfOpenHours) == true {
+			d := 60 * time.Minute
+			startOfOpenHours = time.Now().UTC().Round(d)
+		}
+		for startOfVisit := startOfOpenHours; startOfVisit.After(shift.PlannedTo) == false; startOfVisit = startOfVisit.Add(time.Duration(1) * time.Hour) {
 			_, visitRegistered := closedHours[startOfVisit]
 			if visitRegistered == false {
 				timeOffset := time.Hour * time.Duration(shift.Barber.TimeZoneOffset)
