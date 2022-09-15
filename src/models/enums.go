@@ -4,9 +4,10 @@ type VisitStatus string
 
 const (
 	Created   VisitStatus = "Created"
-	InProcess             = "InProcess"
-	Done                  = "Done"
-	Canceled              = "Canceled"
+	Accepted  VisitStatus = "Accepted"
+	InProcess VisitStatus = "InProcess"
+	Done      VisitStatus = "Done"
+	Canceled  VisitStatus = "Canceled"
 )
 
 type ShiftStatus string
@@ -16,6 +17,10 @@ const (
 	Work     ShiftStatus = "Work"
 	Finished ShiftStatus = "Finished"
 )
+
+func (s *VisitStatus) String() string {
+	return string(*s)
+}
 
 func (s *ShiftStatus) String() string {
 	return string(*s)

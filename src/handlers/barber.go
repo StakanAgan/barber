@@ -10,11 +10,12 @@ import (
 	"github.com/edgedb/edgedb-go"
 	tele "gopkg.in/telebot.v3"
 	"log"
+	"sort"
 	"strconv"
 	"time"
 )
 
-func HandleMainShifts() func(c tele.Context) error {
+func HandleMainShifts() Handler {
 	return func(c tele.Context) error {
 		ctx := context.Background()
 		store, closer := repository.New(ctx)
@@ -28,7 +29,7 @@ func HandleMainShifts() func(c tele.Context) error {
 		buttons := make([]tele.Btn, len(shifts)+2) // количество смен + кнопка для создания смен + кнопка все смены
 		buttons = append(buttons, BtnAllShifts)
 		for _, shift := range shifts {
-			var btn = BarberShiftsInlineKeyboard.Data(shift.String(), "toShift", shift.Id.String())
+			var btn = BarberShiftsInlineKeyboard.Data(shift.String(), "barberToShift", shift.Id.String())
 			buttons = append(buttons, btn)
 		}
 		buttons = append(buttons, BtnCreateShift)
@@ -38,7 +39,7 @@ func HandleMainShifts() func(c tele.Context) error {
 	}
 }
 
-func HandleAllShifts() func(c tele.Context) error {
+func HandleAllShifts() Handler {
 	return func(c tele.Context) error {
 		ctx := context.Background()
 		store, closer := repository.New(ctx)
@@ -52,7 +53,7 @@ func HandleAllShifts() func(c tele.Context) error {
 		buttons := make([]tele.Btn, len(shifts)+2) // количество смен + кнопка для создания смен + кнопка все смены
 		buttons = append(buttons, BtnPlannedShifts)
 		for _, shift := range shifts {
-			var btn = BarberShiftsInlineKeyboard.Data(shift.String(), "toShift", shift.Id.String())
+			var btn = BarberShiftsInlineKeyboard.Data(shift.String(), "barberToShift", shift.Id.String())
 			buttons = append(buttons, btn)
 		}
 		buttons = append(buttons, BtnCreateShift)
@@ -62,7 +63,7 @@ func HandleAllShifts() func(c tele.Context) error {
 	}
 }
 
-func HandleText() func(c tele.Context) error {
+func HandleText() Handler {
 	return func(c tele.Context) error {
 		ctx := context.Background()
 		store, closer := repository.New(ctx)
@@ -135,7 +136,7 @@ func HandleShiftEnter(store *repository.Store, stateManager *fsm.Manager, c tele
 	return err
 }
 
-func HandleStartCreateShift() func(c tele.Context) error {
+func HandleStartCreateShift() Handler {
 	return func(c tele.Context) error {
 		ctx := context.Background()
 		store, closer := repository.New(ctx)
@@ -161,13 +162,13 @@ func HandleStartCreateShift() func(c tele.Context) error {
 	}
 }
 
-func HandleGetShift() func(c tele.Context) error {
+func HandleGetShift() Handler {
 	return func(c tele.Context) error {
 		ctx := context.Background()
 		store, closer := repository.New(ctx)
 		defer closer()
 
-		_, missing := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
+		barber, missing := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
 		if missing == true {
 			log.Println("INFO: Чел как-то нажал не на свою смену")
 			return c.Send("ты кто?")
@@ -194,12 +195,23 @@ func HandleGetShift() func(c tele.Context) error {
 		if needBtn == true {
 			BarberShiftsInlineKeyboard.Inline(BarberShiftsInlineKeyboard.Row(BtnCancelShift, btnAction))
 		}
-		var txt = fmt.Sprintf("<b>%s</b>\n\nСтатус: %s", shift.String(), shift.Status)
+		var txt = fmt.Sprintf("<b>%s</b>\n\nСтатус: %s\n", shift.String(), shift.Status)
+		dateSortedVisits := make(utils.TimeSlice, 0, len(shift.Visits))
+		sort.Sort(dateSortedVisits)
+		timeOffset := time.Hour * time.Duration(barber.TimeZoneOffset)
+		for index, visit := range shift.Visits {
+			totalPrice, _ := visit.TotalPrice.Get()
+			visitTxt := fmt.Sprintf("\n%d. %s - %s\n%s %d ₽\n%s +%s\n",
+				index+1, visit.PlannedFrom.Add(timeOffset).Format("15:04"), visit.PlannedTo.Add(timeOffset).Format("15:04"),
+				visit.Service.Title, totalPrice,
+				visit.Customer.FullName, visit.Customer.Phone)
+			txt += visitTxt
+		}
 		return c.Send(txt, BarberShiftsInlineKeyboard, tele.ModeHTML)
 	}
 }
 
-func HandleStartShift() func(c tele.Context) error {
+func HandleStartShift() Handler {
 	return func(c tele.Context) error {
 		ctx := context.Background()
 		store, closer := repository.New(ctx)
@@ -216,7 +228,7 @@ func HandleStartShift() func(c tele.Context) error {
 	}
 }
 
-func HandleFinishShift() func(c tele.Context) error {
+func HandleFinishShift() Handler {
 	return func(c tele.Context) error {
 		ctx := context.Background()
 		store, closer := repository.New(ctx)
@@ -233,7 +245,7 @@ func HandleFinishShift() func(c tele.Context) error {
 	}
 }
 
-func HandleMainServices() func(c tele.Context) error {
+func HandleMainServices() Handler {
 	return func(c tele.Context) error {
 		ctx := context.Background()
 		store, closer := repository.New(ctx)
@@ -257,7 +269,7 @@ func HandleMainServices() func(c tele.Context) error {
 	}
 }
 
-func HandleStartCreateService() func(c tele.Context) error {
+func HandleStartCreateService() Handler {
 	return func(c tele.Context) error {
 		ctx := context.Background()
 		stateManager, managerCloser := fsm.New(ctx, c.Chat().ID)
@@ -309,7 +321,7 @@ func HandleEndCreateService(store *repository.Store, manager *fsm.Manager, barbe
 	}
 	service = store.Service().Create(barber.Id.String(), service)
 	return c.Send(
-		fmt.Sprintf("Создана услуга\n\n<b>%s</b>\nЦена: <b>%d</b>\nПродолжительность: <b>%d минут</b>", title, price, duration),
+		fmt.Sprintf("Создана услуга\n\n<b>%s</b>\nЦена: <b>%d ₽</b>\nПродолжительность: <b>%d минут</b>", title, price, duration),
 		tele.ModeHTML,
 	)
 }

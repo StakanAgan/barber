@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/joho/godotenv"
 	tele "gopkg.in/telebot.v3"
+	"gopkg.in/telebot.v3/middleware"
 	"log"
 	"os"
 	"time"
@@ -37,28 +38,30 @@ func main() {
 
 	log.Println(result)
 	closer()
+	b.Use(middleware.AutoRespond())
 
-	b.Handle("/start", handlers.HandleStart())
+	b.Handle("/start", tele.HandlerFunc(handlers.HandleStart()))
 
 	// barber handlers
-	b.Handle(&handlers.BtnShifts, handlers.HandleMainShifts())
-	b.Handle(&handlers.BtnPlannedShifts, handlers.HandleMainShifts())
-	b.Handle(&handlers.BtnAllShifts, handlers.HandleAllShifts())
-	b.Handle(&handlers.BtnCreateShift, handlers.HandleStartCreateShift())
-	b.Handle(&handlers.BtnGetShift, handlers.HandleGetShift())
-	b.Handle(&handlers.BtnStartShift, handlers.HandleStartShift())
-	b.Handle(&handlers.BtnFinishShift, handlers.HandleFinishShift())
-	b.Handle(&handlers.BtnServices, handlers.HandleMainServices())
-	b.Handle(&handlers.BtnCreateService, handlers.HandleStartCreateService())
-	b.Handle(tele.OnText, handlers.HandleText())
+	b.Handle(&handlers.BtnShifts, tele.HandlerFunc(handlers.HandleMainShifts()))
+	b.Handle(&handlers.BtnPlannedShifts, tele.HandlerFunc(handlers.HandleMainShifts()))
+	b.Handle(&handlers.BtnAllShifts, tele.HandlerFunc(handlers.HandleAllShifts()))
+	b.Handle(&handlers.BtnCreateShift, tele.HandlerFunc(handlers.HandleStartCreateShift()))
+	b.Handle(&handlers.BtnGetShift, tele.HandlerFunc(handlers.HandleGetShift()))
+	b.Handle(&handlers.BtnStartShift, tele.HandlerFunc(handlers.HandleStartShift()))
+	b.Handle(&handlers.BtnFinishShift, tele.HandlerFunc(handlers.HandleFinishShift()))
+	b.Handle(&handlers.BtnServices, tele.HandlerFunc(handlers.HandleMainServices()))
+	b.Handle(&handlers.BtnCreateService, tele.HandlerFunc(handlers.HandleStartCreateService()))
+	b.Handle(tele.OnText, tele.HandlerFunc(handlers.HandleText()))
 
 	// customer handlers
-	b.Handle(tele.OnContact, handlers.HandleReceivePhone())
-	b.Handle(&handlers.BtnCreateVisit, handlers.HandleStartCreateVisit())
-	b.Handle(&handlers.BtnSelectBarber, handlers.HandleSelectBarber())
-	b.Handle(&handlers.BtnSelectService, handlers.HandleSelectService())
-	b.Handle(&handlers.BtnSelectShiftToVisit, handlers.HandleSelectShift())
-	b.Handle(&handlers.BtnSelectTimeToVisit, handlers.HandleSelectTime())
+	b.Handle(tele.OnContact, tele.HandlerFunc(handlers.HandleReceivePhone()))
+	b.Handle(&handlers.BtnCreateVisit, tele.HandlerFunc(handlers.HandleStartCreateVisit()))
+	b.Handle(&handlers.BtnSelectBarber, tele.HandlerFunc(handlers.HandleSelectBarber()))
+	b.Handle(&handlers.BtnSelectService, tele.HandlerFunc(handlers.HandleSelectService()))
+	b.Handle(&handlers.BtnSelectShiftToVisit, tele.HandlerFunc(handlers.HandleSelectShift()))
+	b.Handle(&handlers.BtnSelectTimeToVisit, tele.HandlerFunc(handlers.HandleSelectTime()))
+	b.Handle(&handlers.BtnAcceptVisit, tele.HandlerFunc(handlers.HandleAcceptVisit()))
 
 	log.Println("INFO: Bot started...")
 	b.Start()

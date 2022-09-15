@@ -20,15 +20,15 @@ type Visit struct {
 	edgedb.Optional
 	BarberShift   BarberShift             `edgedb:"barberShift"`
 	Customer      Customer                `edgedb:"customer"`
+	Service       Service                 `edgedb:"service"`
 	Id            edgedb.UUID             `edgedb:"id"`
 	PlannedFrom   time.Time               `edgedb:"plannedFrom"`
 	PlannedTo     time.Time               `edgedb:"plannedTo"`
 	ActualFrom    edgedb.OptionalDateTime `edgedb:"actualFrom"`
 	ActualTo      edgedb.OptionalDateTime `edgedb:"actualTo"`
-	Service       Service                 `edgedb:"service"`
-	Price         uint64                  `edgedb:"price"`
-	DiscountPrice uint64                  `edgedb:"discountPrice"`
-	TotalPrice    uint64                  `edgedb:"totalPrice"`
+	Price         int64                   `edgedb:"price"`
+	DiscountPrice int64                   `edgedb:"discountPrice"`
+	TotalPrice    edgedb.OptionalInt64    `edgedb:"totalPrice"`
 	Status        VisitStatus             `edgedb:"status"`
 }
 
@@ -73,5 +73,5 @@ func (b BarberShift) String() string {
 }
 
 func (s Service) String() string {
-	return fmt.Sprintf("%s - %d минут - %d рублей", s.Title, s.Duration/60_000_000, s.Price)
+	return fmt.Sprintf("%s - %d минут - %d ₽", s.Title, s.Duration/60_000_000, s.Price)
 }

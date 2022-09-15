@@ -61,8 +61,9 @@ module default {
     property price -> int64{
       constraint min_value(0);  
     };
-    property discountPrice -> int64{
+    required property discountPrice -> int64{
       constraint min_value(0);
+      default := 0;
     };
     constraint expression on (
       .discountPrice <= .price
@@ -72,6 +73,7 @@ module default {
     required property deleted -> bool{
       default := false;
     };
+    constraint exclusive on ((.plannedFrom, .barberShift));
   }
   type Service {
     required link barber -> Barber;

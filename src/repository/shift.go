@@ -82,7 +82,7 @@ func (r *ShiftRepositoryImpl) Get(shiftId string) (models.BarberShift, bool) {
 	var query = fmt.Sprintf("select BarberShift{"+
 		"id, barber: {fullName, timeZoneOffset},"+
 		" status, plannedFrom, plannedTo, actualFrom, actualTo, visits: {"+
-		"customer: {fullName, phone}, plannedFrom, plannedTo"+
+		"customer: {fullName, phone}, plannedFrom, plannedTo, totalPrice, service: {title}"+
 		"}"+
 		"} filter .id = <uuid>'%s';", shiftId)
 	err := r.client.QuerySingle(r.ctx, query, &shift)

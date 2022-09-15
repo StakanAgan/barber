@@ -8,7 +8,9 @@ import (
 	"log"
 )
 
-func HandleStart() func(c tele.Context) error {
+type Handler func(c tele.Context) error
+
+func HandleStart() Handler {
 	return func(c tele.Context) error {
 		ctx := context.Background()
 		store, closer := repository.New(ctx)

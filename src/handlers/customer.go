@@ -3,6 +3,7 @@ package handlers
 import (
 	"benny/src/fsm"
 	"benny/src/models"
+	"benny/src/notifications"
 	"benny/src/repository"
 	"benny/src/utils"
 	"context"
@@ -14,7 +15,7 @@ import (
 	"time"
 )
 
-func HandleReceivePhone() func(c tele.Context) error {
+func HandleReceivePhone() Handler {
 	return func(c tele.Context) error {
 		ctx := context.Background()
 		store, closer := repository.New(ctx)
@@ -31,7 +32,7 @@ func HandleReceivePhone() func(c tele.Context) error {
 	}
 }
 
-func HandleStartCreateVisit() func(c tele.Context) error {
+func HandleStartCreateVisit() Handler {
 	return func(c tele.Context) error {
 		ctx := context.Background()
 		store, closer := repository.New(ctx)
@@ -57,7 +58,7 @@ func HandleStartCreateVisit() func(c tele.Context) error {
 	}
 }
 
-func HandleSelectBarber() func(c tele.Context) error {
+func HandleSelectBarber() Handler {
 	return func(c tele.Context) error {
 		ctx := context.Background()
 		store, closer := repository.New(ctx)
@@ -90,7 +91,7 @@ func HandleSelectBarber() func(c tele.Context) error {
 	}
 }
 
-func HandleSelectService() func(c tele.Context) error {
+func HandleSelectService() Handler {
 	return func(c tele.Context) error {
 		ctx := context.Background()
 		store, closer := repository.New(ctx)
@@ -120,7 +121,7 @@ func HandleSelectService() func(c tele.Context) error {
 	}
 }
 
-func HandleSelectShift() func(c tele.Context) error {
+func HandleSelectShift() Handler {
 	return func(c tele.Context) error {
 		ctx := context.Background()
 		store, closer := repository.New(ctx)
@@ -155,6 +156,9 @@ func HandleSelectShift() func(c tele.Context) error {
 				openHours[startOfVisit] = visit
 			}
 		}
+		if len(openHours) == 0 {
+			return c.Send("Не осталось свободных часов для записи, попробуй другую дату")
+		}
 		dateSortedVisits := make(utils.TimeSlice, 0, len(openHours))
 		buttons := make([]tele.Btn, len(openHours))
 		for _, visit := range openHours {
@@ -184,7 +188,7 @@ func HandleSelectShift() func(c tele.Context) error {
 	}
 }
 
-func HandleSelectTime() func(c tele.Context) error {
+func HandleSelectTime() Handler {
 	return func(c tele.Context) error {
 		ctx := context.Background()
 		store, closer := repository.New(ctx)
@@ -205,9 +209,58 @@ func HandleSelectTime() func(c tele.Context) error {
 		service, _ := store.Service().Get(serviceId)
 		CustomerShiftsInlineKeyboard.Inline(CustomerShiftsInlineKeyboard.Row(BtnDeclineVisit, BtnAcceptVisit))
 		return c.Send(
-			fmt.Sprintf("Барбер: <b>%s</b>\nУслуга: <b>%s</b>\nДата: <b>%s</b>\nВремя: <b>%s - %s</b>\n\nПодтвердить?",
-				barber.FullName, service.String(), times.Date, times.TimeFrom, times.TimeTo),
+			fmt.Sprintf("Барбер: <b>%s</b>\n<b>%s</b>\nЦена: <b>%d ₽</b>\nДата: <b>%s</b>\nВремя: <b>%s - %s</b>\n\nПодтвердить?",
+				barber.FullName, service.Title, service.Price, times.Date, times.TimeFrom, times.TimeTo),
 			CustomerShiftsInlineKeyboard, tele.ModeHTML,
 		)
+	}
+}
+
+func HandleAcceptVisit() Handler {
+	return func(c tele.Context) error {
+		ctx := context.Background()
+		store, closer := repository.New(ctx)
+		defer closer()
+
+		stateManager, managerCloser := fsm.New(ctx, c.Chat().ID)
+		defer managerCloser()
+		defer stateManager.Data().Reset()
+
+		barberId := stateManager.Data().Get("barberId")
+		serviceId := stateManager.Data().Get("serviceId")
+		shiftId := stateManager.Data().Get("shiftId")
+		visitPeriod := stateManager.Data().Get("visitPeriod")
+
+		barber, _ := store.Barber().Get(barberId)
+		service, _ := store.Service().Get(serviceId)
+		shift, _ := store.Shift().Get(shiftId)
+		visitTimes, _ := utils.ParseTimesFromString(visitPeriod)
+		customer, _ := store.Customer().GetByTelegramId(c.Chat().ID)
+
+		var dtParseFormat = "02.01.2006T15:04-07"
+		var dtPassFormat = "%sT%s+0%d"
+		plannedFrom, _ := time.Parse(dtParseFormat, fmt.Sprintf(dtPassFormat, visitTimes.Date, visitTimes.TimeFrom, barber.TimeZoneOffset))
+		plannedTo, _ := time.Parse(dtParseFormat, fmt.Sprintf(dtPassFormat, visitTimes.Date, visitTimes.TimeTo, barber.TimeZoneOffset))
+
+		var visit = &models.Visit{
+			Service:       service,
+			BarberShift:   shift,
+			Customer:      customer,
+			PlannedFrom:   plannedFrom,
+			PlannedTo:     plannedTo,
+			Price:         service.Price,
+			DiscountPrice: 0,
+			Status:        models.Created,
+		}
+		visit, err := store.Visit().Create(visit)
+		if err != nil {
+			return c.Send("Кто-то записался раньше тебя. Попробуй на другое время")
+		}
+		err = notifications.NotifyBarberAboutCreated(c.Bot(), barber.TelegramId, *visit)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		return c.Send("Записано")
 	}
 }

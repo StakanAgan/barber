@@ -15,6 +15,7 @@ type Store struct {
 	barberRepository   *BarberRepositoryImpl
 	shiftRepository    *ShiftRepositoryImpl
 	serviceRepository  *ServiceRepositoryImpl
+	visitRepository    *VisitRepositoryImpl
 }
 
 var config = src.NewDBConfig()
@@ -88,4 +89,12 @@ func (s *Store) Service() ServiceRepository {
 	}
 
 	return s.serviceRepository
+}
+
+func (s *Store) Visit() VisitRepository {
+	if s.visitRepository == nil {
+		s.visitRepository = &VisitRepositoryImpl{ctx: s.ctx, client: s.client}
+	}
+
+	return s.visitRepository
 }
