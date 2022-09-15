@@ -28,7 +28,7 @@ func HandleReceivePhone() Handler {
 		}
 		customer = store.Customer().Create(customer)
 		MainCustomerKeyboard.Reply(MainBarberKeyboard.Row(BtnCreateVisit))
-		return c.Send(fmt.Sprintf("%s", customer.Id), MainCustomerKeyboard)
+		return c.Send(fmt.Sprintf("Велком, %s\n\nЕсли хочешь записаться на стригу, нажми на кнопку внизу", customer.FullName), MainCustomerKeyboard)
 	}
 }
 
