@@ -3,8 +3,8 @@ package handlers
 import (
 	"benny/src/fsm"
 	"benny/src/models"
-	"benny/src/notifications"
 	"benny/src/repository"
+	"benny/src/services"
 	"benny/src/utils"
 	"fmt"
 	tele "gopkg.in/telebot.v3"
@@ -172,9 +172,8 @@ func HandleSelectShift(store *repository.Store, stateManager *fsm.StateManager) 
 		for startOfVisit := startOfOpenHours; startOfVisit.After(shift.PlannedTo) == false; startOfVisit = startOfVisit.Add(time.Duration(1) * time.Hour) {
 			_, visitRegistered := closedHours[startOfVisit]
 			if visitRegistered == false {
-				timeOffset := time.Hour * time.Duration(shift.Barber.TimeZoneOffset)
-				localEndOfVisit := startOfVisit.Add(time.Duration(service.Duration/60_000_000) * time.Minute).Add(timeOffset)
-				localStartOfVisit := startOfVisit.Add(timeOffset)
+				localEndOfVisit := startOfVisit.Add(time.Duration(service.Duration/60_000_000) * time.Minute).Add(shift.Barber.TimeOffset())
+				localStartOfVisit := startOfVisit.Add(shift.Barber.TimeOffset())
 				visit := models.Visit{PlannedFrom: localStartOfVisit, PlannedTo: localEndOfVisit}
 				openHours[startOfVisit] = visit
 			}
@@ -289,7 +288,7 @@ func HandleAcceptVisit(store *repository.Store, stateManager *fsm.StateManager) 
 			MainCustomerKeyboard.Inline(MainCustomerKeyboard.Row(BtnCreateVisit))
 			return c.Send("Кто-то записался раньше тебя. Попробуй на другое время", MainCustomerKeyboard)
 		}
-		err = notifications.NotifyBarberAboutCreated(c.Bot(), barber.TelegramId, *visit)
+		err = services.NotifyBarberAboutCreated(c.Bot(), barber.TelegramId, *visit)
 		if err != nil {
 			c.Send("Бен пока не получил уведомление, но зайдет и прочитает")
 			log.Println("WARN: Not found Benny telegramId")

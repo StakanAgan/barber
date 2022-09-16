@@ -203,11 +203,10 @@ func HandleGetShift(store *repository.Store) Handler {
 		var txt = fmt.Sprintf("<b>%s</b>\n\nСтатус: %s\n", shift.String(), shift.Status)
 		dateSortedVisits := make(utils.TimeSlice, 0, len(shift.Visits))
 		sort.Sort(dateSortedVisits)
-		timeOffset := time.Hour * time.Duration(barber.TimeZoneOffset)
 		for index, visit := range shift.Visits {
 			totalPrice, _ := visit.TotalPrice.Get()
 			visitTxt := fmt.Sprintf("\n%d. %s - %s\n%s %d ₽\n%s +%s\n",
-				index+1, visit.PlannedFrom.Add(timeOffset).Format("15:04"), visit.PlannedTo.Add(timeOffset).Format("15:04"),
+				index+1, visit.PlannedFrom.Add(barber.TimeOffset()).Format("15:04"), visit.PlannedTo.Add(barber.TimeOffset()).Format("15:04"),
 				visit.Service.Title, totalPrice,
 				visit.Customer.FullName, visit.Customer.Phone)
 			txt += visitTxt

@@ -65,12 +65,15 @@ type Service struct {
 	Duration edgedb.Duration `edgedb:"duration"`
 }
 
+func (b Barber) TimeOffset() time.Duration {
+	return time.Hour * time.Duration(b.TimeZoneOffset)
+}
+
 func (b BarberShift) String() string {
-	timeOffset := time.Hour * time.Duration(b.Barber.TimeZoneOffset)
 	return fmt.Sprintf("%s %s до %s",
-		b.PlannedFrom.Add(timeOffset).Format("02.01.2006"),
-		b.PlannedFrom.Add(timeOffset).Format("15:04"),
-		b.PlannedTo.Add(timeOffset).Format("15:04"))
+		b.PlannedFrom.Add(b.Barber.TimeOffset()).Format("02.01.2006"),
+		b.PlannedFrom.Add(b.Barber.TimeOffset()).Format("15:04"),
+		b.PlannedTo.Add(b.Barber.TimeOffset()).Format("15:04"))
 }
 
 func (s Service) String() string {

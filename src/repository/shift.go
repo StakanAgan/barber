@@ -17,6 +17,7 @@ type ShiftRepository interface {
 	Get(shiftId string) (models.BarberShift, error)
 	Delete(shiftId string) (bool, error)
 	UpdateStatus(shiftId string, status models.ShiftStatus) (models.BarberShift, error)
+	GetToday(barberId string) (models.BarberShift, bool)
 }
 
 type ShiftRepositoryImpl struct {
@@ -113,4 +114,17 @@ func (r *ShiftRepositoryImpl) UpdateStatus(shiftId string, status models.ShiftSt
 		log.Printf("ERROR: error on update status of barber shift, shiftId: %s, status: %s, err: %s", shiftId, status, err)
 	}
 	return shift, err
+}
+
+func (r *ShiftRepositoryImpl) GetToday(barberId string) (models.BarberShift, bool) {
+	var query = fmt.Sprintf("select BarberShift{plannedFrom, plannedTo}"+
+		" filter .barber.id=<uuid>'%s'"+
+		" and datetime_current() - .plannedFrom < <duration>'24 hours'"+
+		" limit 1;", barberId)
+	var shift models.BarberShift
+	err := r.client.QuerySingle(r.ctx, query, &shift)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return shift, shift.Missing()
 }
