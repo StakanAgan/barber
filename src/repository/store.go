@@ -46,10 +46,13 @@ func NewDBClient(ctx context.Context) (*edgedb.Client, func()) {
 	if err != nil {
 		log.Fatal(fmt.Sprintf("Can't connect to DB, err: %s", err))
 	}
-	log.Println(result)
+	log.Printf("INFO: %s", result)
 
 	return client, func() {
-		client.Close()
+		err := client.Close()
+		if err != nil {
+			log.Printf("ERROR: while close DB, err: %s", err)
+		}
 	}
 }
 

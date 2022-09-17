@@ -4,6 +4,7 @@ import (
 	"benny/src/fsm"
 	"benny/src/handlers"
 	"benny/src/repository"
+	"benny/src/services"
 	"context"
 	"github.com/joho/godotenv"
 	tele "gopkg.in/telebot.v3"
@@ -24,6 +25,7 @@ func setHandlers(b *tele.Bot, store *repository.Store, stateManager *fsm.StateMa
 	b.Handle(&handlers.BtnGetShift, tele.HandlerFunc(handlers.HandleGetShift(store)))
 	b.Handle(&handlers.BtnStartShift, tele.HandlerFunc(handlers.HandleStartShift(store)))
 	b.Handle(&handlers.BtnFinishShift, tele.HandlerFunc(handlers.HandleFinishShift(store)))
+	b.Handle(&handlers.BtnCancelShift, tele.HandlerFunc(handlers.HandleCancelShift(store)))
 	b.Handle(&handlers.BtnServices, tele.HandlerFunc(handlers.HandleMainServices(store)))
 	b.Handle(&handlers.BtnCreateService, tele.HandlerFunc(handlers.HandleStartCreateService(stateManager)))
 	b.Handle(tele.OnText, tele.HandlerFunc(handlers.HandleText(store, stateManager)))
@@ -61,6 +63,9 @@ func main() {
 		log.Fatal(err)
 	}
 	b.Use(middleware.AutoRespond())
+	log.Println("INFO: Add task for create shifts...")
+	go services.CreateNewBarberShiftOnNextWeek(*b, store)
+	log.Println("INFO: Set handlers...")
 	setHandlers(b, store, stateManager)
 	log.Println("INFO: Bot started...")
 	b.Start()

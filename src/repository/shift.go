@@ -16,7 +16,10 @@ type ShiftRepository interface {
 	GetActual(barberId string) ([]models.BarberShift, error)
 	Get(shiftId string) (models.BarberShift, error)
 	Delete(shiftId string) (bool, error)
+	Cancel(shiftId string) (models.BarberShift, error)
 	UpdateStatus(shiftId string, status models.ShiftStatus) (models.BarberShift, error)
+	GetLast(barberId string) (models.BarberShift, error)
+	GetNext(barberId string) (models.BarberShift, error)
 }
 
 type ShiftRepositoryImpl struct {
@@ -111,6 +114,60 @@ func (r *ShiftRepositoryImpl) UpdateStatus(shiftId string, status models.ShiftSt
 	err := r.client.QuerySingle(r.ctx, query, &shift)
 	if err != nil {
 		log.Printf("ERROR: error on update status of barber shift, shiftId: %s, status: %s, err: %s", shiftId, status, err)
+	}
+	return shift, err
+}
+
+func (r *ShiftRepositoryImpl) Cancel(shiftId string) (models.BarberShift, error) {
+	err := r.client.Tx(r.ctx, func(ctx context.Context, tx *edgedb.Tx) error {
+		var shiftQuery = fmt.Sprintf("update BarberShift filter .id=<uuid>'%s' set {status := ShiftStatus.Canceled}", shiftId)
+		if e := tx.Execute(ctx, shiftQuery); e != nil {
+			return e
+		}
+		var visitQuery = fmt.Sprintf("update Visit filter .barberShift.id=<uuid>'%s' set {status := VisitStatus.Canceled}", shiftId)
+		if e := tx.Execute(ctx, visitQuery); e != nil {
+			return e
+		}
+		return nil
+	})
+	var shift models.BarberShift
+	var query = fmt.Sprintf("select BarberShift{visits: {"+
+		"customer: {telegramId, fullName, phone}, plannedFrom, plannedTo, totalPrice, service: {title}"+
+		"}} filter .id = <uuid>'%s';", shiftId)
+	err = r.client.QuerySingle(r.ctx, query, &shift)
+	if err != nil {
+		log.Printf("ERROR: error on get barber shift, shiftId: %s, err: %s", shiftId, err)
+	}
+	return shift, err
+}
+
+func (r *ShiftRepositoryImpl) GetLast(barberId string) (models.BarberShift, error) {
+	var query = fmt.Sprintf("select BarberShift{plannedFrom, plannedTo, visits: {"+
+		"customer: {fullName, phone}, plannedFrom, plannedTo, totalPrice, service: {title}"+
+		"}}"+
+		" filter .barber.id=<uuid>'%s'"+
+		" and datetime_current() - .plannedFrom < <duration>'24 hours'"+
+		" limit 1;", barberId)
+	var shift models.BarberShift
+	err := r.client.QuerySingle(r.ctx, query, &shift)
+	if err != nil {
+		log.Printf("ERROR: error on get today barber shift, barberId: %s, err: %s", barberId, err)
+	}
+	return shift, err
+}
+
+func (r *ShiftRepositoryImpl) GetNext(barberId string) (models.BarberShift, error) {
+	var query = fmt.Sprintf("select BarberShift{plannedFrom, plannedTo, visits: {"+
+		"customer: {fullName, phone}, plannedFrom, plannedTo, totalPrice, service: {title}"+
+		"}}"+
+		" filter .barber.id=<uuid>'%s'"+
+		" and .status != ShiftStatus.Canceled"+
+		" and datetime_current() < .plannedFrom order by .plannedFrom"+
+		" limit 1;", barberId)
+	var shift models.BarberShift
+	err := r.client.QuerySingle(r.ctx, query, &shift)
+	if err != nil {
+		log.Printf("ERROR: error on get next barber shift, barberId: %s, err: %s", barberId, err)
 	}
 	return shift, err
 }

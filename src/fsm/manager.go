@@ -22,9 +22,14 @@ type StateManager struct {
 
 var config = src.NewRedisConfig()
 
-func New(ctx context.Context) (*StateManager, func() error) {
+func New(ctx context.Context) (*StateManager, func()) {
 	client := redis.NewClient(config)
-	return &StateManager{ctx: ctx, client: client}, client.Close
+	return &StateManager{ctx: ctx, client: client}, func() {
+		err := client.Close()
+		if err != nil {
+			log.Printf("ERROR: while close Redis connection, err: %s", err)
+		}
+	}
 }
 
 func (m *StateManager) State(telegramId int64) *UserStateManagerImpl {

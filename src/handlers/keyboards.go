@@ -20,7 +20,7 @@ var (
 	BtnGetService                = BarberServicesInlineKeyboard.Data("Перейти к сервису", "barberToService")
 	BtnCreateService             = BarberServicesInlineKeyboard.Data("🖋 Добавить услугу", "createService")
 
-	PhoneRequestKeyboard = &tele.ReplyMarkup{ResizeKeyboard: true}
+	PhoneRequestKeyboard = &tele.ReplyMarkup{ResizeKeyboard: true, RemoveKeyboard: true, OneTimeKeyboard: true}
 	BtnRequestPhone      = PhoneRequestKeyboard.Contact("☎️ Поделиться цифрами")
 
 	MainCustomerKeyboard = &tele.ReplyMarkup{ResizeKeyboard: true}
