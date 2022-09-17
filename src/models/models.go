@@ -11,7 +11,7 @@ type Customer struct {
 	Id             edgedb.UUID `edgedb:"id"`
 	FullName       string      `edgedb:"fullName"`
 	Phone          string      `edgedb:"phone"`
-	TelegramId     uint64      `edgedb:"telegramId"`
+	TelegramId     int64       `edgedb:"telegramId"`
 	Visits         []Visit     `edgedb:"visits"`
 	TimeZoneOffset int64       `edgedb:"timeZoneOffset"`
 }

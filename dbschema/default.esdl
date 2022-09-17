@@ -27,7 +27,7 @@ module default {
     multi link shifts := .<barber[is BarberShift];
     multi link services := .<barber[is Service] 
   }
-  scalar type ShiftStatus extending enum<Planned, Work, Finished>;
+  scalar type ShiftStatus extending enum<Planned, Work, Finished, Canceled>;
   type BarberShift {
     required link barber -> Barber;
     required property status -> ShiftStatus;

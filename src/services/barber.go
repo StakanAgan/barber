@@ -3,7 +3,6 @@ package services
 import (
 	"benny/src/models"
 	"benny/src/repository"
-	"context"
 	"fmt"
 	tele "gopkg.in/telebot.v3"
 	"log"
@@ -19,35 +18,44 @@ func NotifyBarberAboutCreated(b *tele.Bot, barberTelegramId int64, visit models.
 	return err
 }
 
-func CreateNewBarberShiftOnNextWeek(b tele.Bot) {
+func NotifyCustomerAboutCancel(b *tele.Bot, barber models.Barber, visit models.Visit) error {
+	customerTg := &tele.User{ID: visit.Customer.TelegramId}
+	totalPrice, _ := visit.TotalPrice.Get()
+	_, err := b.Send(customerTg, fmt.Sprintf("У %s отменилась смена, поэтому отменилась запись\n\n"+
+		"%s %d ₽\n<b>%s</b>", barber.FullName, visit.Service.Title, totalPrice,
+		visit.PlannedFrom.Add(barber.TimeOffset()).Format("02.01.2006 15:04")), tele.ModeHTML)
+	return err
+}
+
+func CreateNewBarberShiftOnNextWeek(b tele.Bot, store *repository.Store) {
 	for range time.Tick(time.Hour) {
 		now := time.Now().UTC()
 		if now.Hour() != 20 {
 			log.Println("INFO: Not now, later.")
 			continue
 		}
-		ctx := context.Background()
-		store, closer := repository.New(ctx)
-		barber, missing := store.Barber().GetFirst()
-		if missing == true {
+
+		barber, err := store.Barber().GetFirst()
+		if barber.Missing() {
 			log.Println("WARN: No one barber")
-			closer()
 			continue
 		}
-		todayShift, missing := store.Shift().GetToday(barber.Id.String())
-		if missing == true {
+		todayShift, err := store.Shift().GetLast(barber.Id.String())
+		if err != nil {
+			log.Println("ERROR: Error while get today shift")
+			continue
+		}
+		if barber.Missing() {
 			log.Println("INFO: Today without shift")
-			closer()
 			continue
 		}
 		newShift := &models.BarberShift{
 			PlannedFrom: todayShift.PlannedFrom.UTC().AddDate(0, 0, 7),
 			PlannedTo:   todayShift.PlannedTo.UTC().AddDate(0, 0, 7),
 		}
-		newShift, err := store.Shift().Create(barber.Id.String(), newShift)
+		newShift, err = store.Shift().Create(barber.Id.String(), newShift)
 		if err != nil {
 			log.Println("INFO: Shift already created on next week")
-			closer()
 			continue
 		}
 		barberTg := &tele.User{ID: barber.TelegramId}
@@ -59,7 +67,6 @@ func CreateNewBarberShiftOnNextWeek(b tele.Bot) {
 		if err != nil {
 			log.Println("WARN: No notify about new shift barber")
 		}
-		closer()
 	}
 
 }

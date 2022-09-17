@@ -19,11 +19,12 @@ func HandleReceivePhone(store *repository.Store) Handler {
 		var customer = &models.Customer{
 			Phone:      c.Message().Contact.PhoneNumber,
 			FullName:   fmt.Sprintf("%s %s", c.Message().Contact.LastName, c.Message().Contact.FirstName),
-			TelegramId: uint64(c.Chat().ID),
+			TelegramId: c.Chat().ID,
 		}
 		customer, err := store.Customer().Create(customer)
 		if err != nil {
-			return c.Send("Не удалось залогиниться. Попробуй написать @ctxkn")
+			PhoneRequestKeyboard.Reply(PhoneRequestKeyboard.Row(BtnRequestPhone))
+			return c.Send("Не удалось залогиниться. Попробуй написать @ctxkn", PhoneRequestKeyboard)
 		}
 		MainCustomerKeyboard.Inline(MainBarberKeyboard.Row(BtnCreateVisit))
 		return c.Send(fmt.Sprintf("Велком, %s", customer.FullName), MainCustomerKeyboard)
@@ -75,7 +76,10 @@ func HandleStartCreateVisit(store *repository.Store, stateManager *fsm.StateMana
 		if barber.Missing() {
 			return c.Send("Не найден такой барбер")
 		}
-		stateManager.Data(c.Chat().ID).Set("barberId", barber.Id.String())
+		err = stateManager.Data(c.Chat().ID).Set("barberId", barber.Id.String())
+		if err != nil {
+			return c.Send("Какая-то ошибка...")
+		}
 		shifts, err := store.Shift().GetActual(barber.Id.String())
 		if err != nil {
 			return c.Send("Какая-то ошибка, попробуй позже")
@@ -83,12 +87,12 @@ func HandleStartCreateVisit(store *repository.Store, stateManager *fsm.StateMana
 		if len(shifts) == 0 {
 			return c.Send("У Бена нет актуальных смен")
 		}
-		services, err := store.Service().GetAll(barber.Id.String())
+		barberServices, err := store.Service().GetAll(barber.Id.String())
 		if err != nil {
 			return c.Send("Какая-то ошибка, попробуй позже")
 		}
-		buttons := make([]tele.Btn, len(services))
-		for _, service := range services {
+		buttons := make([]tele.Btn, len(barberServices))
+		for _, service := range barberServices {
 			var btn = BarberShiftsInlineKeyboard.Data(service.String(), "customerToService", service.Id.String())
 			buttons = append(buttons, btn)
 		}
@@ -101,7 +105,10 @@ func HandleStartCreateVisit(store *repository.Store, stateManager *fsm.StateMana
 
 func HandleSelectService(store *repository.Store, stateManager *fsm.StateManager) Handler {
 	return func(c tele.Context) error {
-		stateManager.Data(c.Chat().ID).Set("serviceId", c.Callback().Data)
+		err := stateManager.Data(c.Chat().ID).Set("serviceId", c.Callback().Data)
+		if err != nil {
+			return c.Send("Ошибка..")
+		}
 
 		serviceId := c.Callback().Data
 		service, err := store.Service().Get(serviceId)
@@ -140,7 +147,10 @@ func HandleSelectShift(store *repository.Store, stateManager *fsm.StateManager) 
 	return func(c tele.Context) error {
 		customerTgId := &c.Chat().ID
 		shiftId := c.Callback().Data
-		stateManager.Data(*customerTgId).Set("shiftId", shiftId)
+		err := stateManager.Data(*customerTgId).Set("shiftId", shiftId)
+		if err != nil {
+			return c.Send("Ошибка...")
+		}
 
 		serviceId := stateManager.Data(*customerTgId).Get("serviceId")
 		service, err := store.Service().Get(serviceId)
@@ -188,7 +198,7 @@ func HandleSelectShift(store *repository.Store, stateManager *fsm.StateManager) 
 		}
 		sort.Sort(dateSortedVisits)
 		for index, potentialVisit := range dateSortedVisits {
-			stateManager.Data(*customerTgId).Set(
+			err := stateManager.Data(*customerTgId).Set(
 				strconv.Itoa(index),
 				fmt.Sprintf(
 					"%s %s-%s",
@@ -197,6 +207,9 @@ func HandleSelectShift(store *repository.Store, stateManager *fsm.StateManager) 
 					potentialVisit.PlannedTo.Format("15:04"),
 				),
 			)
+			if err != nil {
+				return c.Send("Ошибка...")
+			}
 			var btn = BarberShiftsInlineKeyboard.Data(
 				fmt.Sprintf("%s - %s", potentialVisit.PlannedFrom.Format("15:04"), potentialVisit.PlannedTo.Format("15:04")),
 				"customerToTime", strconv.Itoa(index))
@@ -215,7 +228,10 @@ func HandleSelectTime(store *repository.Store, stateManager *fsm.StateManager) H
 		customerTgId := c.Chat().ID
 		timeId := c.Callback().Data
 		timeStr := stateManager.Data(customerTgId).Get(timeId)
-		stateManager.Data(customerTgId).Set("visitPeriod", timeStr)
+		err := stateManager.Data(customerTgId).Set("visitPeriod", timeStr)
+		if err != nil {
+			return c.Send("Ошибка...")
+		}
 		times, err := utils.ParseTimesFromString(timeStr)
 		if err != nil {
 			log.Fatal(err)
@@ -290,7 +306,7 @@ func HandleAcceptVisit(store *repository.Store, stateManager *fsm.StateManager) 
 		}
 		err = services.NotifyBarberAboutCreated(c.Bot(), barber.TelegramId, *visit)
 		if err != nil {
-			c.Send("Бен пока не получил уведомление, но зайдет и прочитает")
+			err = c.Send("Бен пока не получил уведомление, но зайдет и прочитает")
 			log.Println("WARN: Not found Benny telegramId")
 		}
 		MainCustomerKeyboard.Inline(MainCustomerKeyboard.Row(BtnCreateVisit))

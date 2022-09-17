@@ -4,6 +4,7 @@ import (
 	"benny/src/fsm"
 	"benny/src/models"
 	"benny/src/repository"
+	"benny/src/services"
 	"benny/src/utils"
 	"fmt"
 	"github.com/edgedb/edgedb-go"
@@ -197,15 +198,19 @@ func HandleGetShift(store *repository.Store) Handler {
 		default:
 			needBtn = false
 		}
+		BarberShiftsInlineKeyboard.Inline()
 		if needBtn == true {
-			BarberShiftsInlineKeyboard.Inline(BarberShiftsInlineKeyboard.Row(BtnCancelShift, btnAction))
+			BarberShiftsInlineKeyboard.Inline(
+				BarberShiftsInlineKeyboard.Row(
+					BarberShiftsInlineKeyboard.Data(BtnCancelShift.Text, BtnCancelShift.Unique, shiftId), btnAction),
+			)
 		}
 		var txt = fmt.Sprintf("<b>%s</b>\n\nСтатус: %s\n", shift.String(), shift.Status)
 		dateSortedVisits := make(utils.TimeSlice, 0, len(shift.Visits))
 		sort.Sort(dateSortedVisits)
 		for index, visit := range shift.Visits {
 			totalPrice, _ := visit.TotalPrice.Get()
-			visitTxt := fmt.Sprintf("\n%d. %s - %s\n%s %d ₽\n%s +%s\n",
+			visitTxt := fmt.Sprintf("\n<b>%d. %s - %s</b>\n%s %d ₽\n%s +%s\n",
 				index+1, visit.PlannedFrom.Add(barber.TimeOffset()).Format("15:04"), visit.PlannedTo.Add(barber.TimeOffset()).Format("15:04"),
 				visit.Service.Title, totalPrice,
 				visit.Customer.FullName, visit.Customer.Phone)
@@ -253,6 +258,32 @@ func HandleFinishShift(store *repository.Store) Handler {
 	}
 }
 
+func HandleCancelShift(store *repository.Store) Handler {
+	return func(c tele.Context) error {
+		barber, err := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
+		if err != nil {
+			return c.Send("Какая-то ошибка...")
+		}
+		if barber.Missing() {
+			log.Println("INFO: Чел как-то нажал не на свою смену")
+			return c.Send("ты кто?")
+		}
+		shiftId := c.Callback().Data
+		shift, err := store.Shift().Cancel(shiftId)
+		if err != nil {
+			return c.Send("Какая-то ошибка...")
+		}
+		for _, visit := range shift.Visits {
+			err := services.NotifyCustomerAboutCancel(c.Bot(), *barber, visit)
+			if err != nil {
+				c.Send(fmt.Sprintf("Не получилось оповестись %s +%s", visit.Customer.FullName, visit.Customer.Phone))
+			}
+		}
+		c.Send("Смена отменена, все записи тоже, клиентов оповестили (если не сказано иное), все тип-топ")
+		return HandleGetShift(store)(c)
+	}
+}
+
 func HandleMainServices(store *repository.Store) Handler {
 	return func(c tele.Context) error {
 		barber, err := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
@@ -263,12 +294,12 @@ func HandleMainServices(store *repository.Store) Handler {
 			log.Println("INFO: Чел как-то нажал не на свою смену")
 			return c.Send("ты кто?")
 		}
-		services, err := store.Service().GetAll(barber.Id.String())
+		barberServices, err := store.Service().GetAll(barber.Id.String())
 		if err != nil {
 			return c.Send("Какая-то ошибка...")
 		}
-		buttons := make([]tele.Btn, len(services)+1) // количество смен + кнопка для создания смен + кнопка все смены
-		for _, service := range services {
+		buttons := make([]tele.Btn, len(barberServices)+1) // количество смен + кнопка для создания смен + кнопка все смены
+		for _, service := range barberServices {
 			var btn = BarberShiftsInlineKeyboard.Data(service.String(), "barberToService", service.Id.String())
 			buttons = append(buttons, btn)
 		}
