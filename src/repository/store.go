@@ -3,6 +3,7 @@ package repository
 import (
 	"benny/src"
 	"context"
+	"fmt"
 	"github.com/edgedb/edgedb-go"
 	"log"
 	"os"
@@ -40,6 +41,13 @@ func NewDBClient(ctx context.Context) (*edgedb.Client, func()) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	var result string
+	err = client.QuerySingle(ctx, "SELECT 'EdgeDB connected...'", &result)
+	if err != nil {
+		log.Fatal(fmt.Sprintf("Can't connect to DB, err: %s", err))
+	}
+	log.Println(result)
+
 	return client, func() {
 		client.Close()
 	}
@@ -51,12 +59,7 @@ func New(ctx context.Context) (*Store, func()) {
 		ctx:    ctx,
 		client: client,
 	}
-	return store, func() {
-		store.barberRepository = nil
-		store.customerRepository = nil
-		store.shiftRepository = nil
-		closer()
-	}
+	return store, closer
 }
 
 func (s *Store) Barber() BarberRepository {

@@ -12,11 +12,11 @@ import (
 
 type ShiftRepository interface {
 	Create(barberId string, shift *models.BarberShift) (*models.BarberShift, error)
-	GetAll(barberId string) ([]models.BarberShift, bool)
-	GetActual(barberId string) ([]models.BarberShift, bool)
-	Get(shiftId string) (models.BarberShift, bool)
-	Delete(shiftId string) bool
-	UpdateStatus(shiftId string, status models.ShiftStatus) (models.BarberShift, bool)
+	GetAll(barberId string) ([]models.BarberShift, error)
+	GetActual(barberId string) ([]models.BarberShift, error)
+	Get(shiftId string) (models.BarberShift, error)
+	Delete(shiftId string) (bool, error)
+	UpdateStatus(shiftId string, status models.ShiftStatus) (models.BarberShift, error)
 }
 
 type ShiftRepositoryImpl struct {
@@ -46,24 +46,25 @@ func (r *ShiftRepositoryImpl) Create(barberId string, shift *models.BarberShift)
 		"};", barberId, plannedFromStr, plannedToStr)
 	err = r.client.QuerySingle(r.ctx, query, shift)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("ERROR: Error on Create BarberShift, query: %s, err: %s", query, err)
+		return shift, err
 	}
 
 	return shift, nil
 }
 
-func (r *ShiftRepositoryImpl) GetAll(barberId string) ([]models.BarberShift, bool) {
+func (r *ShiftRepositoryImpl) GetAll(barberId string) ([]models.BarberShift, error) {
 	var shifts []models.BarberShift
 	var query = fmt.Sprintf("select BarberShift{id, barber: {fullName, timeZoneOffset}, plannedFrom, plannedTo} filter .barber.id = <uuid>'%s';", barberId)
 	err := r.client.Query(r.ctx, query, &shifts)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("ERROR: error on get all barber shifts, barberId: %s, err: %s", barberId, err)
 	}
 
-	return shifts, len(shifts) == 0
+	return shifts, err
 }
 
-func (r *ShiftRepositoryImpl) GetActual(barberId string) ([]models.BarberShift, bool) {
+func (r *ShiftRepositoryImpl) GetActual(barberId string) ([]models.BarberShift, error) {
 	var shifts []models.BarberShift
 	var query = fmt.Sprintf("select BarberShift "+
 		"{id, barber: {fullName, timeZoneOffset}, plannedFrom, plannedTo}"+
@@ -71,13 +72,13 @@ func (r *ShiftRepositoryImpl) GetActual(barberId string) ([]models.BarberShift, 
 		" and .status = ShiftStatus.%s or .status = ShiftStatus.%s;", barberId, models.Planned, models.Work)
 	err := r.client.Query(r.ctx, query, &shifts)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("ERROR: error on get actual barber shifts, barberId: %s, err: %s", barberId, err)
 	}
 
-	return shifts, len(shifts) == 0
+	return shifts, err
 }
 
-func (r *ShiftRepositoryImpl) Get(shiftId string) (models.BarberShift, bool) {
+func (r *ShiftRepositoryImpl) Get(shiftId string) (models.BarberShift, error) {
 	var shift models.BarberShift
 	var query = fmt.Sprintf("select BarberShift{"+
 		"id, barber: {fullName, timeZoneOffset},"+
@@ -87,29 +88,29 @@ func (r *ShiftRepositoryImpl) Get(shiftId string) (models.BarberShift, bool) {
 		"} filter .id = <uuid>'%s';", shiftId)
 	err := r.client.QuerySingle(r.ctx, query, &shift)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("ERROR: error on get barber shift, shiftId: %s, err: %s", shiftId, err)
 	}
-	return shift, shift.Missing()
+	return shift, err
 
 }
 
-func (r *ShiftRepositoryImpl) Delete(shiftId string) bool {
+func (r *ShiftRepositoryImpl) Delete(shiftId string) (bool, error) {
 	var shift models.BarberShift
 
 	var query = fmt.Sprintf("update BarberShift filter .id=<uuid>'%s' set {deleted := true};", shiftId)
 	err := r.client.QuerySingle(r.ctx, query, &shift)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("ERROR: error on delete barber shift, shiftId: %s, err: %s", shiftId, err)
 	}
-	return shift.Missing()
+	return shift.Missing(), err
 }
 
-func (r *ShiftRepositoryImpl) UpdateStatus(shiftId string, status models.ShiftStatus) (models.BarberShift, bool) {
+func (r *ShiftRepositoryImpl) UpdateStatus(shiftId string, status models.ShiftStatus) (models.BarberShift, error) {
 	var query = fmt.Sprintf("update BarberShift filter .id=<uuid>'%s' set {status := ShiftStatus.%s}", shiftId, status)
 	var shift models.BarberShift
 	err := r.client.QuerySingle(r.ctx, query, &shift)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("ERROR: error on update status of barber shift, shiftId: %s, status: %s, err: %s", shiftId, status, err)
 	}
-	return shift, shift.Missing()
+	return shift, err
 }

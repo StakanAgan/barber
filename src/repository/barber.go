@@ -9,11 +9,11 @@ import (
 )
 
 type BarberRepository interface {
-	Create(barber *models.Barber) (*models.Barber, bool)
-	GetByTelegramId(telegramId uint64) (*models.Barber, bool)
-	Get(barberId string) (*models.Barber, bool)
-	GetFirst() (*models.Barber, bool)
-	GetAll() ([]models.Barber, bool)
+	Create(barber *models.Barber) (*models.Barber, error)
+	GetByTelegramId(telegramId uint64) (*models.Barber, error)
+	Get(barberId string) (*models.Barber, error)
+	GetFirst() (*models.Barber, error)
+	GetAll() ([]models.Barber, error)
 }
 
 type BarberRepositoryImpl struct {
@@ -21,7 +21,7 @@ type BarberRepositoryImpl struct {
 	client *edgedb.Client
 }
 
-func (r *BarberRepositoryImpl) Create(barber *models.Barber) (*models.Barber, bool) {
+func (r *BarberRepositoryImpl) Create(barber *models.Barber) (*models.Barber, error) {
 	var result models.Barber
 	var query = fmt.Sprintf("insert Barber {"+
 		"fullName := '%s', "+
@@ -30,23 +30,23 @@ func (r *BarberRepositoryImpl) Create(barber *models.Barber) (*models.Barber, bo
 		"};", barber.FullName, barber.Phone, barber.TelegramId)
 	err := r.client.QuerySingle(r.ctx, query, &result)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("ERROR: error on create barber: err: %s", err)
 	}
 
-	return &result, result.Missing()
+	return &result, err
 }
 
-func (r *BarberRepositoryImpl) GetByTelegramId(telegramId uint64) (*models.Barber, bool) {
+func (r *BarberRepositoryImpl) GetByTelegramId(telegramId uint64) (*models.Barber, error) {
 	var result models.Barber
 	var query = fmt.Sprintf("select Barber {id, fullName, phone, telegramId, timeZoneOffset} filter .telegramId = %d;", telegramId)
 	err := r.client.QuerySingle(r.ctx, query, &result)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("ERROR: error on get barber by tg id, barberTgId: %d, err: %s", telegramId, err)
 	}
-	return &result, result.Missing()
+	return &result, err
 }
 
-func (r *BarberRepositoryImpl) Get(barberId string) (*models.Barber, bool) {
+func (r *BarberRepositoryImpl) Get(barberId string) (*models.Barber, error) {
 	var barber models.Barber
 	var query = fmt.Sprintf("select Barber{"+
 		"id, fullName, phone, telegramId, timeZoneOffset,"+
@@ -55,12 +55,12 @@ func (r *BarberRepositoryImpl) Get(barberId string) (*models.Barber, bool) {
 		"} filter .id = <uuid>'%s';", barberId)
 	err := r.client.QuerySingle(r.ctx, query, &barber)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("ERROR: error on get barber, barberId: %s, err: %s", barberId, err)
 	}
-	return &barber, barber.Missing()
+	return &barber, err
 }
 
-func (r *BarberRepositoryImpl) GetFirst() (*models.Barber, bool) {
+func (r *BarberRepositoryImpl) GetFirst() (*models.Barber, error) {
 	var barber models.Barber
 	var query = "select Barber{" +
 		"id, fullName, phone, telegramId, timeZoneOffset," +
@@ -69,12 +69,12 @@ func (r *BarberRepositoryImpl) GetFirst() (*models.Barber, bool) {
 		"} limit 1;"
 	err := r.client.QuerySingle(r.ctx, query, &barber)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("ERROR: error on get first barber, err: %s", err)
 	}
-	return &barber, barber.Missing()
+	return &barber, err
 }
 
-func (r *BarberRepositoryImpl) GetAll() ([]models.Barber, bool) {
+func (r *BarberRepositoryImpl) GetAll() ([]models.Barber, error) {
 	var barbers []models.Barber
 	var query = "select Barber{" +
 		"id, fullName, phone, timeZoneOffset" +
@@ -83,7 +83,7 @@ func (r *BarberRepositoryImpl) GetAll() ([]models.Barber, bool) {
 		" and count(.services filter .deleted = false) > 0;"
 	err := r.client.Query(r.ctx, query, &barbers)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("ERROR: error on get all barbers, err: %s", err)
 	}
-	return barbers, len(barbers) == 0
+	return barbers, err
 }

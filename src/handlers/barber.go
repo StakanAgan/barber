@@ -5,7 +5,6 @@ import (
 	"benny/src/models"
 	"benny/src/repository"
 	"benny/src/utils"
-	"context"
 	"fmt"
 	"github.com/edgedb/edgedb-go"
 	tele "gopkg.in/telebot.v3"
@@ -15,17 +14,20 @@ import (
 	"time"
 )
 
-func HandleMainShifts() Handler {
+func HandleMainShifts(store *repository.Store) Handler {
 	return func(c tele.Context) error {
-		ctx := context.Background()
-		store, closer := repository.New(ctx)
-		defer closer()
-
-		barber, missing := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
-		if missing == true {
-			log.Printf("INFO: Customer %d try to get shifts", uint64(c.Chat().ID))
+		barber, err := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
+		if err != nil {
+			return c.Send("Какая-то ошибка...")
 		}
-		shifts, _ := store.Shift().GetActual(barber.Id.String())
+		if barber.Missing() {
+			log.Printf("INFO: Customer %d try to get shifts", uint64(c.Chat().ID))
+			return c.Send("Тебя не нашлось в списке")
+		}
+		shifts, err := store.Shift().GetActual(barber.Id.String())
+		if err != nil {
+			return c.Send("Не получится пока увидеть смены брат")
+		}
 		buttons := make([]tele.Btn, len(shifts)+2) // количество смен + кнопка для создания смен + кнопка все смены
 		buttons = append(buttons, BtnAllShifts)
 		for _, shift := range shifts {
@@ -35,21 +37,26 @@ func HandleMainShifts() Handler {
 		buttons = append(buttons, BtnCreateShift)
 		var rows = BarberShiftsInlineKeyboard.Split(1, buttons)
 		BarberShiftsInlineKeyboard.Inline(rows...)
+		if c.Callback() != nil {
+			return c.Edit("Твои смены:", BarberShiftsInlineKeyboard)
+		}
 		return c.Send("Твои смены:", BarberShiftsInlineKeyboard)
 	}
 }
 
-func HandleAllShifts() Handler {
+func HandleAllShifts(store *repository.Store) Handler {
 	return func(c tele.Context) error {
-		ctx := context.Background()
-		store, closer := repository.New(ctx)
-		defer closer()
-
-		barber, missing := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
-		if missing == true {
+		barber, err := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
+		if err != nil {
+			return c.Send("Какая-то ошибка...")
+		}
+		if barber.Missing() {
 			log.Printf("INFO: Customer %d try to get shifts", uint64(c.Chat().ID))
 		}
-		shifts, _ := store.Shift().GetAll(barber.Id.String())
+		shifts, err := store.Shift().GetAll(barber.Id.String())
+		if err != nil {
+			return c.Send("Возникла проблемка, не получилось показать все смены")
+		}
 		buttons := make([]tele.Btn, len(shifts)+2) // количество смен + кнопка для создания смен + кнопка все смены
 		buttons = append(buttons, BtnPlannedShifts)
 		for _, shift := range shifts {
@@ -59,31 +66,27 @@ func HandleAllShifts() Handler {
 		buttons = append(buttons, BtnCreateShift)
 		var rows = BarberShiftsInlineKeyboard.Split(1, buttons)
 		BarberShiftsInlineKeyboard.Inline(rows...)
-		return c.Send("Твои смены:", BarberShiftsInlineKeyboard)
+		return c.Edit("Твои смены:", BarberShiftsInlineKeyboard)
 	}
 }
 
-func HandleText() Handler {
+func HandleText(store *repository.Store, stateManager *fsm.StateManager) Handler {
 	return func(c tele.Context) error {
-		ctx := context.Background()
-		store, closer := repository.New(ctx)
-		defer closer()
-
-		stateManager, managerCloser := fsm.New(ctx, c.Chat().ID)
-		defer managerCloser()
-
-		barber, missing := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
-		if missing == true {
+		barber, err := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
+		if err != nil {
+			return c.Send("Какая-то ошибка...")
+		}
+		if barber.Missing() {
 			return c.Send("ты кто?")
 		}
-		state := stateManager.State().Get()
+		state := stateManager.State(c.Chat().ID).Get()
 		switch state {
 		case fsm.ShiftEnter:
 			err := HandleShiftEnter(store, stateManager, c, barber)
 			if err != nil {
 				return err
 			}
-			return HandleMainShifts()(c)
+			return HandleMainShifts(store)(c)
 		case fsm.ServiceEnterTitle:
 			return HandleServiceEnterTitle(stateManager, c)
 		case fsm.ServiceEnterPrice:
@@ -93,15 +96,15 @@ func HandleText() Handler {
 			if err != nil {
 				return err
 			}
-			stateManager.Data().Reset()
-			return HandleMainServices()(c)
+			stateManager.Data(c.Chat().ID).Reset()
+			return HandleMainServices(store)(c)
 		default:
 			return c.Send("Я тебя не понял")
 		}
 	}
 }
 
-func HandleShiftEnter(store *repository.Store, stateManager *fsm.Manager, c tele.Context, barber *models.Barber) error {
+func HandleShiftEnter(store *repository.Store, stateManager *fsm.StateManager, c tele.Context, barber *models.Barber) error {
 	times, err := utils.ParseTimesFromString(c.Text())
 	now := time.Now()
 
@@ -134,21 +137,18 @@ func HandleShiftEnter(store *repository.Store, stateManager *fsm.Manager, c tele
 	if err != nil {
 		log.Fatal(err)
 	}
-	stateManager.State().Reset()
+	stateManager.State(c.Chat().ID).Reset()
 	return err
 }
 
-func HandleStartCreateShift() Handler {
+func HandleStartCreateShift(store *repository.Store, stateManager *fsm.StateManager) Handler {
 	return func(c tele.Context) error {
-		ctx := context.Background()
-		store, closer := repository.New(ctx)
-		defer closer()
-
-		stateManager, managerCloser := fsm.New(ctx, c.Chat().ID)
-		defer managerCloser()
-
-		_, missing := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
-		if missing == true {
+		customerTgId := &c.Chat().ID
+		barber, err := store.Barber().GetByTelegramId(uint64(*customerTgId))
+		if err != nil {
+			return c.Send("Какая-то ошибка...")
+		}
+		if barber.Missing() {
 			log.Println("INFO: Чел как-то нажал кнопку создать смену")
 			return c.Send("ты кто?")
 		}
@@ -157,7 +157,7 @@ func HandleStartCreateShift() Handler {
 		if tgerr != nil {
 			log.Fatal(tgerr)
 		}
-		err := stateManager.State().Set(fsm.ShiftEnter)
+		err = stateManager.State(*customerTgId).Set(fsm.ShiftEnter)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -165,20 +165,22 @@ func HandleStartCreateShift() Handler {
 	}
 }
 
-func HandleGetShift() Handler {
+func HandleGetShift(store *repository.Store) Handler {
 	return func(c tele.Context) error {
-		ctx := context.Background()
-		store, closer := repository.New(ctx)
-		defer closer()
-
-		barber, missing := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
-		if missing == true {
+		barber, err := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
+		if err != nil {
+			return c.Send("Какая-то ошибка...")
+		}
+		if barber.Missing() {
 			log.Println("INFO: Чел как-то нажал не на свою смену")
 			return c.Send("ты кто?")
 		}
 		shiftId := c.Callback().Data
-		shift, missing := store.Shift().Get(shiftId)
-		if missing == true {
+		shift, err := store.Shift().Get(shiftId)
+		if err != nil {
+			return c.Send("Какая-то ошибка, попробуй позже")
+		}
+		if shift.Missing() {
 			return c.Send("Не та смена")
 		}
 		var (
@@ -214,52 +216,58 @@ func HandleGetShift() Handler {
 	}
 }
 
-func HandleStartShift() Handler {
+func HandleStartShift(store *repository.Store) Handler {
 	return func(c tele.Context) error {
-		ctx := context.Background()
-		store, closer := repository.New(ctx)
-		defer closer()
-
-		_, missing := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
-		if missing == true {
+		barber, err := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
+		if err != nil {
+			return c.Send("Какая-то ошибка...")
+		}
+		if barber.Missing() {
 			log.Println("INFO: Чел как-то нажал не на свою смену")
 			return c.Send("ты кто?")
 		}
 		shiftId := c.Callback().Data
-		_, missing = store.Shift().UpdateStatus(shiftId, models.Work)
-		return HandleGetShift()(c)
+		_, err = store.Shift().UpdateStatus(shiftId, models.Work)
+		if err != nil {
+			return c.Send("Какая-то ошибка...")
+		}
+		return HandleGetShift(store)(c)
 	}
 }
 
-func HandleFinishShift() Handler {
+func HandleFinishShift(store *repository.Store) Handler {
 	return func(c tele.Context) error {
-		ctx := context.Background()
-		store, closer := repository.New(ctx)
-		defer closer()
-
-		_, missing := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
-		if missing == true {
+		barber, err := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
+		if err != nil {
+			return c.Send("Какая-то ошибка...")
+		}
+		if barber.Missing() {
 			log.Println("INFO: Чел как-то нажал не на свою смену")
 			return c.Send("ты кто?")
 		}
 		shiftId := c.Callback().Data
-		_, missing = store.Shift().UpdateStatus(shiftId, models.Finished)
-		return HandleGetShift()(c)
+		_, err = store.Shift().UpdateStatus(shiftId, models.Finished)
+		if err != nil {
+			return c.Send("Какая-то ошибка...")
+		}
+		return HandleGetShift(store)(c)
 	}
 }
 
-func HandleMainServices() Handler {
+func HandleMainServices(store *repository.Store) Handler {
 	return func(c tele.Context) error {
-		ctx := context.Background()
-		store, closer := repository.New(ctx)
-		defer closer()
-
-		barber, missing := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
-		if missing == true {
+		barber, err := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
+		if err != nil {
+			return c.Send("Какая-то ошибка...")
+		}
+		if barber.Missing() {
 			log.Println("INFO: Чел как-то нажал не на свою смену")
 			return c.Send("ты кто?")
 		}
-		services, missing := store.Service().GetAll(barber.Id.String())
+		services, err := store.Service().GetAll(barber.Id.String())
+		if err != nil {
+			return c.Send("Какая-то ошибка...")
+		}
 		buttons := make([]tele.Btn, len(services)+1) // количество смен + кнопка для создания смен + кнопка все смены
 		for _, service := range services {
 			var btn = BarberShiftsInlineKeyboard.Data(service.String(), "barberToService", service.Id.String())
@@ -272,46 +280,42 @@ func HandleMainServices() Handler {
 	}
 }
 
-func HandleStartCreateService() Handler {
+func HandleStartCreateService(stateManager *fsm.StateManager) Handler {
 	return func(c tele.Context) error {
-		ctx := context.Background()
-		stateManager, managerCloser := fsm.New(ctx, c.Chat().ID)
-		defer managerCloser()
-
 		err := c.Send("Введи название услуги")
-		stateManager.State().Set(fsm.ServiceEnterTitle)
+		stateManager.State(c.Chat().ID).Set(fsm.ServiceEnterTitle)
 		return err
 	}
 }
 
-func HandleServiceEnterTitle(manager *fsm.Manager, c tele.Context) error {
-	manager.Data().Set("title", c.Text())
+func HandleServiceEnterTitle(manager *fsm.StateManager, c tele.Context) error {
+	manager.Data(c.Chat().ID).Set("title", c.Text())
 	err := c.Send("Введи стоимость услуги в рублях целым числом\nнапример <b>1000</b>", tele.ModeHTML)
-	manager.State().Set(fsm.ServiceEnterPrice)
+	manager.State(c.Chat().ID).Set(fsm.ServiceEnterPrice)
 	return err
 }
 
-func HandleServiceEnterPrice(manager *fsm.Manager, c tele.Context) error {
+func HandleServiceEnterPrice(manager *fsm.StateManager, c tele.Context) error {
 	price, err := strconv.Atoi(c.Text())
 	if err != nil {
 		return c.Send("Невалидная стоимость. Укажи целое значение, например <b>1000</b>", tele.ModeHTML)
 	}
-	manager.Data().Set("price", strconv.Itoa(price))
+	manager.Data(c.Chat().ID).Set("price", strconv.Itoa(price))
 	err = c.Send("Введи продолжительность в минутах одним числом\nнапример <b>60</b>, если услуга длится час\n"+
 		"или <b>90</b>, если услуга займет полтора часа", tele.ModeHTML)
-	manager.State().Set(fsm.ServiceEnterDuration)
+	manager.State(c.Chat().ID).Set(fsm.ServiceEnterDuration)
 	return err
 }
 
-func HandleEndCreateService(store *repository.Store, manager *fsm.Manager, barber models.Barber, c tele.Context) error {
+func HandleEndCreateService(store *repository.Store, manager *fsm.StateManager, barber models.Barber, c tele.Context) error {
 	duration, err := strconv.Atoi(c.Text())
 	if err != nil {
 		return c.Send("Невалидная продолжительность. Укажи целое значение,"+
 			"\nнапример <b>60</b>, если услуга длится час,"+
 			"\nили <b>90</b>, если услуга займет полтора часа", tele.ModeHTML)
 	}
-	title := manager.Data().Get("title")
-	priceStr := manager.Data().Get("price")
+	title := manager.Data(c.Chat().ID).Get("title")
+	priceStr := manager.Data(c.Chat().ID).Get("price")
 	price, _ := strconv.Atoi(priceStr)
 	log.Println(priceStr)
 	log.Println(price)
@@ -322,7 +326,10 @@ func HandleEndCreateService(store *repository.Store, manager *fsm.Manager, barbe
 		Price:    int64(price),
 		Duration: edgedb.Duration(time.Minute * time.Duration(duration)),
 	}
-	service = store.Service().Create(barber.Id.String(), service)
+	service, err = store.Service().Create(barber.Id.String(), service)
+	if err != nil {
+		return c.Send("Какая-то ошибка...")
+	}
 	return c.Send(
 		fmt.Sprintf("Создана услуга\n\n<b>%s</b>\nЦена: <b>%d ₽</b>\nПродолжительность: <b>%d минут</b>", title, price, duration),
 		tele.ModeHTML,

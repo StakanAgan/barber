@@ -6,7 +6,6 @@ import (
 	"benny/src/notifications"
 	"benny/src/repository"
 	"benny/src/utils"
-	"context"
 	"fmt"
 	tele "gopkg.in/telebot.v3"
 	"log"
@@ -15,18 +14,17 @@ import (
 	"time"
 )
 
-func HandleReceivePhone() Handler {
+func HandleReceivePhone(store *repository.Store) Handler {
 	return func(c tele.Context) error {
-		ctx := context.Background()
-		store, closer := repository.New(ctx)
-		defer closer()
-
 		var customer = &models.Customer{
 			Phone:      c.Message().Contact.PhoneNumber,
 			FullName:   fmt.Sprintf("%s %s", c.Message().Contact.LastName, c.Message().Contact.FirstName),
 			TelegramId: uint64(c.Chat().ID),
 		}
-		customer = store.Customer().Create(customer)
+		customer, err := store.Customer().Create(customer)
+		if err != nil {
+			return c.Send("Не удалось залогиниться. Попробуй написать @ctxkn")
+		}
 		MainCustomerKeyboard.Inline(MainBarberKeyboard.Row(BtnCreateVisit))
 		return c.Send(fmt.Sprintf("Велком, %s", customer.FullName), MainCustomerKeyboard)
 	}
@@ -59,31 +57,36 @@ func HandleReceivePhone() Handler {
 //	}
 //}
 
-func HandleStartCreateVisit() Handler {
+func HandleStartCreateVisit(store *repository.Store, stateManager *fsm.StateManager) Handler {
 	return func(c tele.Context) error {
-		ctx := context.Background()
-		store, closer := repository.New(ctx)
-		defer closer()
-
-		stateManager, managerCloser := fsm.New(ctx, c.Chat().ID)
-		defer managerCloser()
-
-		_, missing := store.Customer().GetByTelegramId(c.Chat().ID)
-		if missing == true {
+		customer, err := store.Customer().GetByTelegramId(c.Chat().ID)
+		if err != nil {
+			return c.Send("Какая-то ошибка...")
+		}
+		if customer.Missing() {
 			log.Printf("WARN: Пользователь: %d %s нажал кнопку записаться, но не был залогинен", c.Chat().ID, c.Chat().Username)
 			return c.Send("wtf")
 		}
 		//barberId := c.Callback().Data
-		barber, missing := store.Barber().GetFirst()
-		if missing == true {
+		barber, err := store.Barber().GetFirst()
+		if err != nil {
+			return c.Send("Какая-то ошибка...")
+		}
+		if barber.Missing() {
 			return c.Send("Не найден такой барбер")
 		}
-		stateManager.Data().Set("barberId", barber.Id.String())
-		_, missing = store.Shift().GetActual(barber.Id.String())
-		if missing == true {
+		stateManager.Data(c.Chat().ID).Set("barberId", barber.Id.String())
+		shifts, err := store.Shift().GetActual(barber.Id.String())
+		if err != nil {
+			return c.Send("Какая-то ошибка, попробуй позже")
+		}
+		if len(shifts) == 0 {
 			return c.Send("У Бена нет актуальных смен")
 		}
-		services, _ := store.Service().GetAll(barber.Id.String())
+		services, err := store.Service().GetAll(barber.Id.String())
+		if err != nil {
+			return c.Send("Какая-то ошибка, попробуй позже")
+		}
 		buttons := make([]tele.Btn, len(services))
 		for _, service := range services {
 			var btn = BarberShiftsInlineKeyboard.Data(service.String(), "customerToService", service.Id.String())
@@ -96,26 +99,29 @@ func HandleStartCreateVisit() Handler {
 	}
 }
 
-func HandleSelectService() Handler {
+func HandleSelectService(store *repository.Store, stateManager *fsm.StateManager) Handler {
 	return func(c tele.Context) error {
-		ctx := context.Background()
-		store, closer := repository.New(ctx)
-		defer closer()
-
-		stateManager, managerCloser := fsm.New(ctx, c.Chat().ID)
-		defer managerCloser()
-		stateManager.Data().Set("serviceId", c.Callback().Data)
+		stateManager.Data(c.Chat().ID).Set("serviceId", c.Callback().Data)
 
 		serviceId := c.Callback().Data
-		service, _ := store.Service().Get(serviceId)
+		service, err := store.Service().Get(serviceId)
+		if err != nil {
+			return c.Send("Какая-то ошибка, попробуй позже")
+		}
 
-		barberId := stateManager.Data().Get("barberId")
-		barber, missing := store.Barber().Get(barberId)
-		if missing == true {
+		barberId := stateManager.Data(c.Chat().ID).Get("barberId")
+		barber, err := store.Barber().Get(barberId)
+		if err != nil {
+			return c.Send("Какая-то ошибка...")
+		}
+		if barber.Missing() {
 			return c.Send("Не найден такой барбер")
 		}
-		shifts, missing := store.Shift().GetActual(barberId)
-		if missing == true {
+		shifts, err := store.Shift().GetActual(barberId)
+		if err != nil {
+			return c.Send("Какая-то ошибка, попробуй позже")
+		}
+		if len(shifts) == 0 {
 			return c.Send("У Бена нет актуальных смен")
 		}
 		buttons := make([]tele.Btn, len(shifts))
@@ -130,26 +136,29 @@ func HandleSelectService() Handler {
 	}
 }
 
-func HandleSelectShift() Handler {
+func HandleSelectShift(store *repository.Store, stateManager *fsm.StateManager) Handler {
 	return func(c tele.Context) error {
-		ctx := context.Background()
-		store, closer := repository.New(ctx)
-		defer closer()
-
-		stateManager, managerCloser := fsm.New(ctx, c.Chat().ID)
-		defer managerCloser()
+		customerTgId := &c.Chat().ID
 		shiftId := c.Callback().Data
-		stateManager.Data().Set("shiftId", shiftId)
+		stateManager.Data(*customerTgId).Set("shiftId", shiftId)
 
-		serviceId := stateManager.Data().Get("serviceId")
-		service, _ := store.Service().Get(serviceId)
-		_, missing := store.Customer().GetByTelegramId(c.Chat().ID)
-		if missing == true {
-			log.Printf("WARN: Пользователь: %startOfVisit %s нажал кнопку записаться, но не был залогинен", c.Chat().ID, c.Chat().Username)
-			return c.Send("wtf")
+		serviceId := stateManager.Data(*customerTgId).Get("serviceId")
+		service, err := store.Service().Get(serviceId)
+		if err != nil {
+			return c.Send("Какая-то ошибка, попробуй позже")
 		}
-		shift, _ := store.Shift().Get(shiftId)
-
+		customer, err := store.Customer().GetByTelegramId(c.Chat().ID)
+		if err != nil {
+			return c.Send("Какая-то ошибка...")
+		}
+		if customer.Missing() {
+			log.Printf("WARN: Пользователь: %startOfVisit %s нажал кнопку записаться, но не был залогинен", c.Chat().ID, c.Chat().Username)
+			return c.Send("Какая-то ошибка...")
+		}
+		shift, err := store.Shift().Get(shiftId)
+		if err != nil {
+			return c.Send("Какая-то ошибка")
+		}
 		closedHours := make(map[time.Time]time.Time)
 		for _, visit := range shift.Visits {
 			closedHours[visit.PlannedFrom] = visit.PlannedTo
@@ -180,7 +189,7 @@ func HandleSelectShift() Handler {
 		}
 		sort.Sort(dateSortedVisits)
 		for index, potentialVisit := range dateSortedVisits {
-			stateManager.Data().Set(
+			stateManager.Data(*customerTgId).Set(
 				strconv.Itoa(index),
 				fmt.Sprintf(
 					"%s %s-%s",
@@ -202,25 +211,26 @@ func HandleSelectShift() Handler {
 	}
 }
 
-func HandleSelectTime() Handler {
+func HandleSelectTime(store *repository.Store, stateManager *fsm.StateManager) Handler {
 	return func(c tele.Context) error {
-		ctx := context.Background()
-		store, closer := repository.New(ctx)
-		defer closer()
-
-		stateManager, managerCloser := fsm.New(ctx, c.Chat().ID)
-		defer managerCloser()
+		customerTgId := c.Chat().ID
 		timeId := c.Callback().Data
-		timeStr := stateManager.Data().Get(timeId)
-		stateManager.Data().Set("visitPeriod", timeStr)
+		timeStr := stateManager.Data(customerTgId).Get(timeId)
+		stateManager.Data(customerTgId).Set("visitPeriod", timeStr)
 		times, err := utils.ParseTimesFromString(timeStr)
 		if err != nil {
 			log.Fatal(err)
 		}
-		barberId := stateManager.Data().Get("barberId")
-		barber, _ := store.Barber().Get(barberId)
-		serviceId := stateManager.Data().Get("serviceId")
-		service, _ := store.Service().Get(serviceId)
+		barberId := stateManager.Data(customerTgId).Get("barberId")
+		barber, err := store.Barber().Get(barberId)
+		if err != nil {
+			return c.Send("Какая-то ошибка...")
+		}
+		serviceId := stateManager.Data(customerTgId).Get("serviceId")
+		service, err := store.Service().Get(serviceId)
+		if err != nil {
+			return c.Send("Какая-то ошибка, попробуй позже")
+		}
 		CustomerShiftsInlineKeyboard.Inline(CustomerShiftsInlineKeyboard.Row(BtnDeclineVisit, BtnAcceptVisit))
 		return c.Send(
 			fmt.Sprintf("Барбер: <b>%s</b>\n<b>%s</b>\nЦена: <b>%d ₽</b>\nДата: <b>%s</b>\nВремя: <b>%s - %s</b>\n\nПодтвердить?",
@@ -230,27 +240,34 @@ func HandleSelectTime() Handler {
 	}
 }
 
-func HandleAcceptVisit() Handler {
+func HandleAcceptVisit(store *repository.Store, stateManager *fsm.StateManager) Handler {
 	return func(c tele.Context) error {
-		ctx := context.Background()
-		store, closer := repository.New(ctx)
-		defer closer()
-
-		stateManager, managerCloser := fsm.New(ctx, c.Chat().ID)
-		defer managerCloser()
-		defer stateManager.Data().Reset()
+		customerTgId := c.Chat().ID
+		defer stateManager.Data(customerTgId).Reset()
 		defer c.Bot().EditReplyMarkup(c.Message(), nil)
 
-		barberId := stateManager.Data().Get("barberId")
-		serviceId := stateManager.Data().Get("serviceId")
-		shiftId := stateManager.Data().Get("shiftId")
-		visitPeriod := stateManager.Data().Get("visitPeriod")
+		barberId := stateManager.Data(customerTgId).Get("barberId")
+		serviceId := stateManager.Data(customerTgId).Get("serviceId")
+		shiftId := stateManager.Data(customerTgId).Get("shiftId")
+		visitPeriod := stateManager.Data(customerTgId).Get("visitPeriod")
 
-		barber, _ := store.Barber().Get(barberId)
-		service, _ := store.Service().Get(serviceId)
-		shift, _ := store.Shift().Get(shiftId)
+		barber, err := store.Barber().Get(barberId)
+		if err != nil {
+			return c.Send("Какая-то ошибка...")
+		}
+		service, err := store.Service().Get(serviceId)
+		if err != nil {
+			return c.Send("Какая-то ошибка, попробуй позже")
+		}
+		shift, err := store.Shift().Get(shiftId)
+		if err != nil {
+			return c.Send("Какая-то ошибка...")
+		}
 		visitTimes, _ := utils.ParseTimesFromString(visitPeriod)
-		customer, _ := store.Customer().GetByTelegramId(c.Chat().ID)
+		customer, err := store.Customer().GetByTelegramId(c.Chat().ID)
+		if err != nil {
+			return c.Send("Какая-то ошибка...")
+		}
 
 		var dtParseFormat = "02.01.2006T15:04-07"
 		var dtPassFormat = "%sT%s+0%d"
@@ -267,7 +284,7 @@ func HandleAcceptVisit() Handler {
 			DiscountPrice: 0,
 			Status:        models.Created,
 		}
-		visit, err := store.Visit().Create(visit)
+		visit, err = store.Visit().Create(visit)
 		if err != nil {
 			MainCustomerKeyboard.Inline(MainCustomerKeyboard.Row(BtnCreateVisit))
 			return c.Send("Кто-то записался раньше тебя. Попробуй на другое время", MainCustomerKeyboard)
@@ -283,13 +300,9 @@ func HandleAcceptVisit() Handler {
 	}
 }
 
-func HandleDeclineVisit() Handler {
+func HandleDeclineVisit(stateManager *fsm.StateManager) Handler {
 	return func(c tele.Context) error {
-		ctx := context.Background()
-
-		stateManager, managerCloser := fsm.New(ctx, c.Chat().ID)
-		defer managerCloser()
-		defer stateManager.Data().Reset()
+		defer stateManager.Data(c.Chat().ID).Reset()
 		defer c.Bot().EditReplyMarkup(c.Message(), nil)
 		MainCustomerKeyboard.Inline(MainCustomerKeyboard.Row(BtnCreateVisit))
 

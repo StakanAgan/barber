@@ -9,5 +9,5 @@ COPY . .
 
 RUN go mod download
 
-RUN go build --tags dynamic -o benny .
+RUN go build -o benny .
 CMD ["/app/benny"]

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"benny/src/repository"
-	"context"
 	"fmt"
 	tele "gopkg.in/telebot.v3"
 	"log"
@@ -10,17 +9,19 @@ import (
 
 type Handler func(c tele.Context) error
 
-func HandleStart() Handler {
+func HandleStart(store *repository.Store) Handler {
 	return func(c tele.Context) error {
-		ctx := context.Background()
-		store, closer := repository.New(ctx)
-		defer closer()
-
-		var barber, missing = store.Barber().GetByTelegramId(uint64(c.Chat().ID))
-		if missing == true {
+		barber, err := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
+		if err != nil {
+			return c.Send("Какая-то ошибка...")
+		}
+		if barber.Missing() {
 			log.Printf("INFO: User %d try to Start bot", uint64(c.Chat().ID))
-			customer, missing := store.Customer().GetByTelegramId(c.Chat().ID)
-			if missing == true {
+			customer, err := store.Customer().GetByTelegramId(c.Chat().ID)
+			if err != nil {
+				return c.Send("Какая-то ошибка...")
+			}
+			if customer.Missing() {
 				PhoneRequestKeyboard.Reply(PhoneRequestKeyboard.Row(BtnRequestPhone))
 				return c.Send("Заделись цифрами, чтобы записаться на стригу. Просто нажми на <b>☎️ Поделиться цифрами</b> внизу 👇🏼", PhoneRequestKeyboard, tele.ModeHTML)
 			}

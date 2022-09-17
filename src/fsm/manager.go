@@ -13,100 +13,99 @@ var (
 	dataKey  = "%d_data"
 )
 
-type Manager struct {
+type StateManager struct {
 	ctx          context.Context
 	client       *redis.Client
-	telegramId   int64
-	stateManager *StateManagerImpl
-	dataManager  *DataManagerImpl
+	stateManager *UserStateManagerImpl
+	dataManager  *UserDataManagerImpl
 }
 
 var config = src.NewRedisConfig()
 
-func New(ctx context.Context, telegramId int64) (*Manager, func() error) {
+func New(ctx context.Context) (*StateManager, func() error) {
 	client := redis.NewClient(config)
-	return &Manager{ctx: ctx, client: client, telegramId: telegramId}, client.Close
+	return &StateManager{ctx: ctx, client: client}, client.Close
 }
 
-func (m *Manager) State() *StateManagerImpl {
+func (m *StateManager) State(telegramId int64) *UserStateManagerImpl {
 	if m.stateManager == nil {
-		m.stateManager = &StateManagerImpl{ctx: m.ctx, client: m.client, key: fmt.Sprintf(stateKey, m.telegramId)}
+		m.stateManager = &UserStateManagerImpl{ctx: m.ctx, client: m.client, key: fmt.Sprintf(stateKey, telegramId)}
 	}
 
 	return m.stateManager
 }
 
-func (m *Manager) Data() *DataManagerImpl {
+func (m *StateManager) Data(telegramId int64) *UserDataManagerImpl {
 	if m.dataManager == nil {
-		m.dataManager = &DataManagerImpl{ctx: m.ctx, client: m.client, key: fmt.Sprintf(dataKey, m.telegramId)}
+		m.dataManager = &UserDataManagerImpl{ctx: m.ctx, client: m.client, key: fmt.Sprintf(dataKey, telegramId)}
 	}
 
 	return m.dataManager
 }
 
-type StateManager interface {
+type UserStateManager interface {
 	Get() State
 	Set(state State) error
 	Reset()
 }
 
-type StateManagerImpl struct {
+type UserStateManagerImpl struct {
 	ctx    context.Context
 	client *redis.Client
 	key    string
 }
 
-type DataManager interface {
+type UserDataManager interface {
 	Set(key string, value string) error
 	Get(key string) (value string)
 	Reset()
 }
 
-type DataManagerImpl struct {
+type UserDataManagerImpl struct {
 	ctx    context.Context
 	client *redis.Client
 	key    string
 }
 
-func (s *StateManagerImpl) Get() State {
+func (s *UserStateManagerImpl) Get() State {
 	state, err := s.client.Get(s.ctx, s.key).Result()
 	if err != nil {
 		if err != redis.Nil {
-			log.Fatal(err)
+			log.Printf("ERROR: error on Get state, key: %s, err: %s", s.key, err)
 		}
 	}
 	return State(state)
 }
 
-func (s *StateManagerImpl) Set(state State) error {
+func (s *UserStateManagerImpl) Set(state State) error {
 	return s.client.Set(s.ctx, s.key, state.String(), 0).Err()
 }
 
-func (s *StateManagerImpl) Reset() {
+func (s *UserStateManagerImpl) Reset() {
 	s.client.Del(s.ctx, s.key)
 }
 
-func (d *DataManagerImpl) Set(key string, value string) error {
+func (d *UserDataManagerImpl) Set(key string, value string) error {
 	userDataKey := fmt.Sprintf("%s_%s", d.key, key)
 	return d.client.Set(d.ctx, userDataKey, value, 0).Err()
 }
 
-func (d *DataManagerImpl) Get(key string) (value string) {
+func (d *UserDataManagerImpl) Get(key string) (value string) {
 	userDataKey := fmt.Sprintf("%s_%s", d.key, key)
 	value, err := d.client.Get(d.ctx, userDataKey).Result()
 	if err != nil {
 		if err != redis.Nil {
-			log.Fatal(err)
+			log.Printf("ERROR: error on Get data, key: %s, err: %s", d.key, err)
 		}
 	}
 	return value
 }
 
-func (d *DataManagerImpl) Reset() {
+func (d *UserDataManagerImpl) Reset() {
 	keys, err := d.client.Keys(d.ctx, d.key).Result()
 	if err != nil {
 		if err != redis.Nil {
-			log.Fatal(err)
+			log.Printf("ERROR: error on Reset data, key: %s, err: %s", d.key, err)
 		}
 	}
 	d.client.Del(d.ctx, keys...)
