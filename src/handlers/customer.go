@@ -26,6 +26,8 @@ func HandleReceivePhone(store *repository.Store) Handler {
 			PhoneRequestKeyboard.Reply(PhoneRequestKeyboard.Row(BtnRequestPhone))
 			return c.Send("Не удалось залогиниться. Попробуй написать @ctxkn", PhoneRequestKeyboard)
 		}
+		keyboard := &tele.ReplyMarkup{RemoveKeyboard: true}
+		c.Send("Будем знакомы", keyboard)
 		MainCustomerKeyboard.Inline(MainBarberKeyboard.Row(BtnCreateVisit))
 		return c.Send(fmt.Sprintf("Велком, %s", customer.FullName), MainCustomerKeyboard)
 	}
