@@ -47,8 +47,9 @@ func main() {
 		log.Fatal(err)
 	}
 	pref := tele.Settings{
-		Token:  os.Getenv("BOT_TOKEN"),
-		Poller: &tele.LongPoller{Timeout: 20 * time.Second},
+		Token:     os.Getenv("BOT_TOKEN"),
+		Poller:    &tele.LongPoller{Timeout: 10 * time.Second},
+		ParseMode: tele.ModeHTML,
 	}
 
 	ctx := context.Background()
@@ -56,6 +57,7 @@ func main() {
 	defer closer()
 
 	stateManager, managerCloser := fsm.New(ctx)
+	log.Println("INFO: Redis connected...")
 	defer managerCloser()
 
 	b, err := tele.NewBot(pref)

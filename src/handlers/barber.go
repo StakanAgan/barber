@@ -31,6 +31,9 @@ func HandleMainShifts(store *repository.Store) Handler {
 		}
 		buttons := make([]tele.Btn, len(shifts)+2) // количество смен + кнопка для создания смен + кнопка все смены
 		buttons = append(buttons, BtnAllShifts)
+		sort.Slice(shifts, func(i, j int) bool {
+			return shifts[i].PlannedFrom.Before(shifts[j].PlannedFrom)
+		})
 		for _, shift := range shifts {
 			var btn = BarberShiftsInlineKeyboard.Data(shift.String(), "barberToShift", shift.Id.String())
 			buttons = append(buttons, btn)
@@ -60,6 +63,9 @@ func HandleAllShifts(store *repository.Store) Handler {
 		}
 		buttons := make([]tele.Btn, len(shifts)+2) // количество смен + кнопка для создания смен + кнопка все смены
 		buttons = append(buttons, BtnPlannedShifts)
+		sort.Slice(shifts, func(i, j int) bool {
+			return shifts[i].PlannedFrom.Before(shifts[j].PlannedFrom)
+		})
 		for _, shift := range shifts {
 			var btn = BarberShiftsInlineKeyboard.Data(shift.String(), "barberToShift", shift.Id.String())
 			buttons = append(buttons, btn)
@@ -276,7 +282,7 @@ func HandleCancelShift(store *repository.Store) Handler {
 		for _, visit := range shift.Visits {
 			err := services.NotifyCustomerAboutCancel(c.Bot(), *barber, visit)
 			if err != nil {
-				c.Send(fmt.Sprintf("Не получилось оповестись %s +%s", visit.Customer.FullName, visit.Customer.Phone))
+				c.Send(fmt.Sprintf("Не получилось оповестить %s +%s", visit.Customer.FullName, visit.Customer.Phone))
 			}
 		}
 		c.Send("Смена отменена, все записи тоже, клиентов оповестили (если не сказано иное), все тип-топ")

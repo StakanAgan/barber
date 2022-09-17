@@ -40,12 +40,15 @@ func CreateNewBarberShiftOnNextWeek(b tele.Bot, store *repository.Store) {
 			log.Println("WARN: No one barber")
 			continue
 		}
+		if err != nil {
+			log.Printf("ERROR: Error while get barber: %s", err)
+		}
 		todayShift, err := store.Shift().GetLast(barber.Id.String())
 		if err != nil {
-			log.Println("ERROR: Error while get today shift")
+			log.Printf("ERROR: Error while get today shift: %s", err)
 			continue
 		}
-		if barber.Missing() {
+		if todayShift.Missing() {
 			log.Println("INFO: Today without shift")
 			continue
 		}
@@ -55,7 +58,7 @@ func CreateNewBarberShiftOnNextWeek(b tele.Bot, store *repository.Store) {
 		}
 		newShift, err = store.Shift().Create(barber.Id.String(), newShift)
 		if err != nil {
-			log.Println("INFO: Shift already created on next week")
+			log.Printf("INFO: Shift already created on next week: %s", err)
 			continue
 		}
 		barberTg := &tele.User{ID: barber.TelegramId}
@@ -65,7 +68,7 @@ func CreateNewBarberShiftOnNextWeek(b tele.Bot, store *repository.Store) {
 			newShift.PlannedTo.Add(barber.TimeOffset()).Format("15:04"),
 		))
 		if err != nil {
-			log.Println("WARN: No notify about new shift barber")
+			log.Printf("WARN: No notify about new shift barber: %s", err)
 		}
 	}
 
