@@ -107,11 +107,16 @@ func (d *UserDataManagerImpl) Get(key string) (value string) {
 }
 
 func (d *UserDataManagerImpl) Reset() {
-	keys, err := d.client.Keys(d.ctx, d.key).Result()
+	keys, err := d.client.Keys(d.ctx, fmt.Sprintf("%s*", d.key)).Result()
 	if err != nil {
 		if err != redis.Nil {
 			log.Printf("ERROR: error on Reset data, key: %s, err: %s", d.key, err)
 		}
 	}
-	d.client.Del(d.ctx, keys...)
+	err = d.client.Del(d.ctx, keys...).Err()
+	if err != nil {
+		if err != redis.Nil {
+			log.Printf("ERROR: error on Reset data, key: %s, err: %s", d.key, err)
+		}
+	}
 }

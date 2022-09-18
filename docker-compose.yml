@@ -2,7 +2,9 @@ version: "3.9"
 
 services:
   backend:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: always
     command: "go run benny"
     env_file:
@@ -11,7 +13,8 @@ services:
       - "80:80"
     depends_on:
       - db
-      - redis
+      - dragonfly
+
   db:
     image: edgedb/edgedb:2.1
     restart: always
@@ -20,18 +23,25 @@ services:
     env_file:
       - .env
     ports:
-      - "5656:5656"
+      - "${DB_PORT}:5656"
     volumes:
       - ./dbschema:/dbschema
       - ./credentials:/root/.config/edgedb/credentials
       - ./volumes/edgedb_data:/var/lib/edgedb/data
 
-  redis:
-    image: "redis:7"
+  dragonfly:
+    build:
+      context: .
+      dockerfile: dragonfly.Dockerfile
     restart: always
-    command: redis-server /usr/local/etc/redis/redis.conf
+    ulimits:
+      memlock: -1
+    env_file:
+      - .env
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT}:6379"
     volumes:
-      - ./volumes/redis:/data
-      - ./redis.conf:/usr/local/etc/redis/redis.conf
+      - dragonflydata:/data
+
+volumes:
+  dragonflydata:
