@@ -3,6 +3,8 @@ package utils
 import (
 	"benny/src/models"
 	"errors"
+	tele "gopkg.in/telebot.v3"
+	"log"
 	"regexp"
 )
 
@@ -37,4 +39,19 @@ func (p TimeSlice) Less(i, j int) bool {
 
 func (p TimeSlice) Swap(i, j int) {
 	p[i], p[j] = p[j], p[i]
+}
+
+func LogUpdates() tele.MiddlewareFunc {
+	return func(next tele.HandlerFunc) tele.HandlerFunc {
+		return func(c tele.Context) error {
+			if c.Callback() != nil {
+				log.Printf("INFO: userId: %d, userName: %s, callback: %s %s",
+					c.Chat().ID, c.Chat().Username, c.Callback().Unique, c.Callback().Data)
+			}
+			if c.Text() != "" {
+				log.Printf("INFO: userId: %d, userName: %s, text: %s", c.Chat().ID, c.Chat().Username, c.Text())
+			}
+			return next(c)
+		}
+	}
 }
