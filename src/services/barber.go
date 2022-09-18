@@ -27,7 +27,7 @@ func NotifyCustomerAboutCancel(b *tele.Bot, barber models.Barber, visit models.V
 	return err
 }
 
-func CreateNewBarberShiftOnNextWeek(b tele.Bot, store *repository.Store) {
+func CreateNewBarberShiftOnNextWeek(b *tele.Bot, store *repository.Store) {
 	for range time.Tick(time.Hour) {
 		now := time.Now().UTC()
 		if now.Hour() != 20 {

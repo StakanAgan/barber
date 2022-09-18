@@ -69,7 +69,7 @@ func main() {
 	b.Use(middleware.AutoRespond())
 	b.Use(utils.LogUpdates())
 	log.Println("INFO: Add task for create shifts...")
-	go services.CreateNewBarberShiftOnNextWeek(*b, store)
+	go services.CreateNewBarberShiftOnNextWeek(b, store)
 	log.Println("INFO: Set handlers...")
 	setHandlers(b, store, stateManager)
 	log.Println("INFO: Bot started...")
