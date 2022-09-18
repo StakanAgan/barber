@@ -64,7 +64,8 @@ func HandleStartCreateVisit(store *repository.Store, stateManager *fsm.StateMana
 	return func(c tele.Context) error {
 		customer, err := store.Customer().GetByTelegramId(c.Chat().ID)
 		if err != nil {
-			return c.Send("Какая-то ошибка...")
+			log.Printf("ERROR: %s", err)
+			return c.Send("Не могу понять кто ты")
 		}
 		if customer.Missing() {
 			log.Printf("WARN: Пользователь: %d %s нажал кнопку записаться, но не был залогинен", c.Chat().ID, c.Chat().Username)
@@ -73,17 +74,21 @@ func HandleStartCreateVisit(store *repository.Store, stateManager *fsm.StateMana
 		//barberId := c.Callback().Data
 		barber, err := store.Barber().GetFirst()
 		if err != nil {
-			return c.Send("Какая-то ошибка...")
+			log.Printf("ERROR: %s", err)
+			return c.Send("Не найден барбер")
 		}
 		if barber.Missing() {
+			log.Printf("ERROR: %s", err)
 			return c.Send("Не найден такой барбер")
 		}
 		err = stateManager.Data(c.Chat().ID).Set("barberId", barber.Id.String())
 		if err != nil {
-			return c.Send("Какая-то ошибка...")
+			log.Printf("ERROR: %s", err)
+			return c.Send("Не могу запомнить барбера")
 		}
 		shifts, err := store.Shift().GetActual(barber.Id.String())
 		if err != nil {
+			log.Printf("ERROR: %s", err)
 			return c.Send("Какая-то ошибка, попробуй позже")
 		}
 		if len(shifts) == 0 {
@@ -91,6 +96,7 @@ func HandleStartCreateVisit(store *repository.Store, stateManager *fsm.StateMana
 		}
 		barberServices, err := store.Service().GetAll(barber.Id.String())
 		if err != nil {
+			log.Printf("ERROR: %s", err)
 			return c.Send("Какая-то ошибка, попробуй позже")
 		}
 		buttons := make([]tele.Btn, len(barberServices))
