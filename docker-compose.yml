@@ -9,8 +9,6 @@ services:
     command: "go run benny"
     env_file:
       - .env
-    ports:
-      - "80:80"
     depends_on:
       - db
       - dragonfly
@@ -22,8 +20,6 @@ services:
       - EDGEDB_SERVER_ADMIN_UI=enabled
     env_file:
       - .env
-    ports:
-      - "${DB_PORT}:5656"
     volumes:
       - ./dbschema:/dbschema
       - ./credentials:/root/.config/edgedb/credentials
@@ -38,8 +34,6 @@ services:
       memlock: -1
     env_file:
       - .env
-    ports:
-      - "${REDIS_PORT}:6379"
     volumes:
       - dragonflydata:/data
 
