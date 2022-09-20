@@ -18,7 +18,7 @@ type BarberRepository interface {
 
 type BarberRepositoryImpl struct {
 	ctx    context.Context
-	client *edgedb.Client
+	client edgedb.Client
 }
 
 func (r *BarberRepositoryImpl) Create(barber *models.Barber) (*models.Barber, error) {

@@ -15,7 +15,7 @@ type CustomerRepository interface {
 
 type CustomerRepositoryImpl struct {
 	ctx    context.Context
-	client *edgedb.Client
+	client edgedb.Client
 }
 
 func (r *CustomerRepositoryImpl) Create(customer *models.Customer) (*models.Customer, error) {

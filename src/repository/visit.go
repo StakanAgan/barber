@@ -17,7 +17,7 @@ type VisitRepository interface {
 
 type VisitRepositoryImpl struct {
 	ctx    context.Context
-	client *edgedb.Client
+	client edgedb.Client
 }
 
 func (r *VisitRepositoryImpl) Create(visit *models.Visit) (*models.Visit, error) {

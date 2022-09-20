@@ -7,11 +7,12 @@ import (
 	"github.com/edgedb/edgedb-go"
 	"log"
 	"os"
+	"time"
 )
 
 type Store struct {
 	ctx                context.Context
-	client             *edgedb.Client
+	client             edgedb.Client
 	customerRepository *CustomerRepositoryImpl
 	barberRepository   *BarberRepositoryImpl
 	shiftRepository    *ShiftRepositoryImpl
@@ -25,11 +26,13 @@ func NewDBClient(ctx context.Context) (*edgedb.Client, func()) {
 	opts := edgedb.Options{}
 	if os.Getenv("ENV") != "local" {
 		opts = edgedb.Options{
-			Database: config.DBName,
-			Host:     config.Host,
-			User:     config.User,
-			Password: edgedb.NewOptionalStr(config.Password),
-			Port:     config.Port,
+			Database:           config.DBName,
+			Host:               config.Host,
+			User:               config.User,
+			Password:           edgedb.NewOptionalStr(config.Password),
+			WaitUntilAvailable: 3 * time.Second,
+			ConnectTimeout:     5 * time.Second,
+			Port:               config.Port,
 			TLSOptions: edgedb.TLSOptions{
 				SecurityMode: edgedb.TLSModeInsecure,
 			},
@@ -60,7 +63,7 @@ func New(ctx context.Context) (*Store, func()) {
 	client, closer := NewDBClient(ctx)
 	store := &Store{
 		ctx:    ctx,
-		client: client,
+		client: *client,
 	}
 	return store, closer
 }

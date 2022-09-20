@@ -13,6 +13,7 @@ type Handler func(c tele.Context) error
 
 func HandleStart(store *repository.Store) Handler {
 	return func(c tele.Context) error {
+		log.Printf("INFO: somebody (%d) press /start", c.Chat().ID)
 		barber, err := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
 		if err != nil {
 			return c.Send("Какая-то ошибка...")
