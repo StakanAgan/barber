@@ -7,6 +7,10 @@ services:
       dockerfile: Dockerfile
     restart: always
     command: "go run benny"
+#    volumes:
+#      - credentials/certs:/var/certs
+#    ports:
+#      - "8000:80"
     env_file:
       - .env
     depends_on:

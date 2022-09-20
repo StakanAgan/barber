@@ -53,6 +53,16 @@ func main() {
 		ParseMode: tele.ModeHTML,
 		Verbose:   os.Getenv("DEBUG") == "true",
 	}
+	//if os.Getenv("ENV") != "local" {
+	//	pref = tele.Settings{
+	//		Token: os.Getenv("BOT_TOKEN"),
+	//		Poller: &tele.Webhook{
+	//			TLS: &tele.WebhookTLS{Key: "/var/certs/privkey.pem", Cert: "/var/certs/cert.pem"},
+	//		},
+	//		ParseMode: tele.ModeHTML,
+	//		Verbose:   os.Getenv("DEBUG") == "true",
+	//	}
+	//}
 
 	ctx := context.Background()
 	store, closer := repository.New(ctx)

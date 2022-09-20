@@ -5,7 +5,9 @@ import (
 	"errors"
 	tele "gopkg.in/telebot.v3"
 	"log"
+	"reflect"
 	"regexp"
+	"runtime"
 )
 
 type Times struct {
@@ -51,6 +53,8 @@ func LogUpdates() tele.MiddlewareFunc {
 			if c.Text() != "" {
 				log.Printf("INFO: userId: %d, userName: %s, text: %s", c.Chat().ID, c.Chat().Username, c.Text())
 			}
+			v := runtime.FuncForPC(reflect.ValueOf(next).Pointer()).Name()
+			log.Printf("INFO: handler %s", v)
 			return next(c)
 		}
 	}
