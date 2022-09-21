@@ -18,12 +18,15 @@ func HandleStart(store *repository.Store) Handler {
 		if err != nil {
 			return c.Send("Какая-то ошибка...")
 		}
+		log.Println("INFO: Point 1")
 		if barber.Missing() {
 			log.Printf("INFO: User %d try to Start bot", uint64(c.Chat().ID))
 			customer, err := store.Customer().GetByTelegramId(c.Chat().ID)
+			log.Println("INFO: Point 7")
 			if err != nil {
 				return c.Send("Какая-то ошибка...")
 			}
+			log.Println("INFO: Point 8")
 			if customer.Missing() {
 				PhoneRequestKeyboard.Reply(PhoneRequestKeyboard.Row(BtnRequestPhone))
 				return c.Send("Заделись цифрами, чтобы записаться на стригу. Просто нажми на <b>☎️ Поделиться цифрами</b> внизу 👇🏼", PhoneRequestKeyboard, tele.ModeHTML)
@@ -31,12 +34,17 @@ func HandleStart(store *repository.Store) Handler {
 			MainCustomerKeyboard.Inline(MainCustomerKeyboard.Row(BtnCreateVisit))
 			return c.Send(fmt.Sprintf("Велком, %s", customer.FullName), MainCustomerKeyboard)
 		}
+		log.Println("INFO: Point 2")
 		nextShift, err := store.Shift().GetNext(barber.Id.String())
+		log.Println("INFO: Point 3")
 		if err != nil {
 			return c.Send("Ошибочка вышла")
 		}
+		log.Println("INFO: Point 4")
 		txt := fmt.Sprintf("Салют, %s", barber.FullName)
+		log.Println("INFO: Point 5")
 		if !nextShift.Missing() {
+			log.Println("INFO: Point 6")
 			txt += fmt.Sprintf("\nСледующая смена <b>%s</b>\nс <b>%s до %s</b>\n\n",
 				nextShift.PlannedFrom.Add(barber.TimeOffset()).Format("02.01.2006"),
 				nextShift.PlannedFrom.Add(barber.TimeOffset()).Format("15:04"),
