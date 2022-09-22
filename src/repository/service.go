@@ -18,7 +18,7 @@ type ServiceRepository interface {
 
 type ServiceRepositoryImpl struct {
 	ctx    context.Context
-	client edgedb.Client
+	client *edgedb.Client
 }
 
 func (r *ServiceRepositoryImpl) Create(barberId string, service *models.Service) (*models.Service, error) {

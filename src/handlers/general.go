@@ -15,6 +15,7 @@ func HandleStart(store *repository.Store) Handler {
 	return func(c tele.Context) error {
 		log.Printf("INFO: somebody (%d) press /start", c.Chat().ID)
 		barber, err := store.Barber().GetByTelegramId(uint64(c.Chat().ID))
+		log.Printf("INFO: Point 0, err: %s", err)
 		if err != nil {
 			return c.Send("Какая-то ошибка...")
 		}

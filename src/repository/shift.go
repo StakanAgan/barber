@@ -24,7 +24,7 @@ type ShiftRepository interface {
 
 type ShiftRepositoryImpl struct {
 	ctx    context.Context
-	client edgedb.Client
+	client *edgedb.Client
 }
 
 func (r *ShiftRepositoryImpl) Create(barberId string, shift *models.BarberShift) (*models.BarberShift, error) {

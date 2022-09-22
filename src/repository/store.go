@@ -12,7 +12,7 @@ import (
 
 type Store struct {
 	ctx                context.Context
-	client             edgedb.Client
+	client             *edgedb.Client
 	customerRepository *CustomerRepositoryImpl
 	barberRepository   *BarberRepositoryImpl
 	shiftRepository    *ShiftRepositoryImpl
@@ -63,7 +63,7 @@ func New(ctx context.Context) (*Store, func()) {
 	client, closer := NewDBClient(ctx)
 	store := &Store{
 		ctx:    ctx,
-		client: *client,
+		client: client,
 	}
 	return store, closer
 }
