@@ -39,7 +39,9 @@ func (r *BarberRepositoryImpl) Create(barber *models.Barber) (*models.Barber, er
 func (r *BarberRepositoryImpl) GetByTelegramId(telegramId uint64) (*models.Barber, error) {
 	var result models.Barber
 	var query = fmt.Sprintf("select Barber {id, fullName, phone, telegramId, timeZoneOffset} filter .telegramId = %d;", telegramId)
+	log.Printf("INFO: query: %s", query)
 	err := r.client.QuerySingle(r.ctx, query, &result)
+	log.Printf("INFO: Get by TGID, err: %s, result: %s", err, result.FullName)
 	if err != nil {
 		log.Printf("ERROR: error on get barber by tg id, barberTgId: %d, err: %s", telegramId, err)
 	}

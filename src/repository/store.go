@@ -44,12 +44,12 @@ func NewDBClient(ctx context.Context) (*edgedb.Client, func()) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	var result string
-	err = client.QuerySingle(ctx, "SELECT 'EdgeDB connected...'", &result)
-	if err != nil {
-		log.Fatal(fmt.Sprintf("Can't connect to DB, err: %s", err))
-	}
-	log.Printf("INFO: %s", result)
+	DBHealthCheck(client, ctx)
+	go func() {
+		for range time.Tick(time.Minute * 5) {
+			DBHealthCheck(client, ctx)
+		}
+	}()
 
 	return client, func() {
 		err := client.Close()
@@ -57,6 +57,15 @@ func NewDBClient(ctx context.Context) (*edgedb.Client, func()) {
 			log.Printf("ERROR: while close DB, err: %s", err)
 		}
 	}
+}
+
+func DBHealthCheck(client *edgedb.Client, ctx context.Context) {
+	var result string
+	err := client.QuerySingle(ctx, "SELECT 'EdgeDB connected...'", &result)
+	if err != nil {
+		log.Fatal(fmt.Sprintf("Can't connect to DB, err: %s", err))
+	}
+	log.Printf("INFO: %s", result)
 }
 
 func New(ctx context.Context) (*Store, func()) {
