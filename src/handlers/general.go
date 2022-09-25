@@ -56,8 +56,11 @@ func HandleStart(store *repository.Store) Handler {
 			}
 
 			dateSortedVisits := make(utils.TimeSlice, 0, len(nextShift.Visits))
+			for _, visit := range nextShift.Visits {
+				dateSortedVisits = append(dateSortedVisits, visit)
+			}
 			sort.Sort(dateSortedVisits)
-			for index, visit := range nextShift.Visits {
+			for index, visit := range dateSortedVisits {
 				totalPrice, _ := visit.TotalPrice.Get()
 				visitTxt := fmt.Sprintf("\n<b>%d. %s - %s</b>\n%s %d ₽\n%s +%s\n",
 					index+1, visit.PlannedFrom.Add(barber.TimeOffset()).Format("15:04"), visit.PlannedTo.Add(barber.TimeOffset()).Format("15:04"),
