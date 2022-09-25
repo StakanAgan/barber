@@ -11,6 +11,7 @@ import (
 type CustomerRepository interface {
 	Create(customer *models.Customer) (*models.Customer, error)
 	GetByTelegramId(telegramId int64) (models.Customer, error)
+	GetAll() ([]models.Customer, error)
 }
 
 type CustomerRepositoryImpl struct {
@@ -39,4 +40,14 @@ func (r *CustomerRepositoryImpl) GetByTelegramId(telegramId int64) (models.Custo
 		log.Printf("ERROR: error on get customer by tg id, tgId: %d, err: %s", telegramId, err)
 	}
 	return customer, err
+}
+
+func (r *CustomerRepositoryImpl) GetAll() ([]models.Customer, error) {
+	var customers []models.Customer
+	var query = "select Customer{id, fullName, phone}"
+	err := r.client.Query(r.ctx, query, &customers)
+	if err != nil {
+		log.Printf("ERROR: error on get all customers, err: %s", err)
+	}
+	return customers, err
 }

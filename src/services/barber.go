@@ -11,7 +11,7 @@ import (
 
 func NotifyBarberAboutCreated(b *tele.Bot, barberTelegramId int64, visit models.Visit) error {
 	barberTg := &tele.User{ID: barberTelegramId}
-	_, err := b.Send(barberTg, fmt.Sprintf("К тебе записались\n\n"+
+	_, err := b.Send(barberTg, fmt.Sprintf("⚡️ К тебе записались\n\n"+
 		"%s %d ₽\n<b>%s</b>\n%s +%s", visit.Service.Title, visit.Price-visit.DiscountPrice,
 		visit.PlannedFrom.Format("02.01.2006 15:04"),
 		visit.Customer.FullName, visit.Customer.Phone), tele.ModeHTML)
@@ -21,7 +21,7 @@ func NotifyBarberAboutCreated(b *tele.Bot, barberTelegramId int64, visit models.
 func NotifyCustomerAboutCancel(b *tele.Bot, barber models.Barber, visit models.Visit) error {
 	customerTg := &tele.User{ID: visit.Customer.TelegramId}
 	totalPrice, _ := visit.TotalPrice.Get()
-	_, err := b.Send(customerTg, fmt.Sprintf("У %s отменилась смена, поэтому отменилась запись\n\n"+
+	_, err := b.Send(customerTg, fmt.Sprintf("⚡️ У %s отменилась смена, поэтому отменилась запись\n\n"+
 		"%s %d ₽\n<b>%s</b>", barber.FullName, visit.Service.Title, totalPrice,
 		visit.PlannedFrom.Add(barber.TimeOffset()).Format("02.01.2006 15:04")), tele.ModeHTML)
 	return err

@@ -67,7 +67,11 @@ func HandleStart(store *repository.Store) Handler {
 			}
 		}
 	send:
-		MainBarberKeyboard.Reply(MainBarberKeyboard.Row(BtnShifts), MainBarberKeyboard.Row(BtnServices))
+		MainBarberKeyboard.Reply(
+			MainBarberKeyboard.Row(BtnShifts),
+			MainBarberKeyboard.Row(BtnServices),
+			MainBarberKeyboard.Row(BtnCustomers),
+		)
 		return c.Send(txt, MainBarberKeyboard, tele.ModeHTML)
 	}
 }

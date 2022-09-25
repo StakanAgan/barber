@@ -371,3 +371,17 @@ func HandleEndCreateService(store *repository.Store, manager *fsm.StateManager, 
 		tele.ModeHTML,
 	)
 }
+
+func HandleCustomers(store *repository.Store) Handler {
+	return func(c tele.Context) error {
+		customers, err := store.Customer().GetAll()
+		if err != nil {
+			return c.Send("Не получилось")
+		}
+		txt := "👨‍👦 Клиентосы"
+		for _, customer := range customers {
+			txt += fmt.Sprintf("\n\n%s. +%s", customer.FullName, customer.Phone)
+		}
+		return c.Send(txt)
+	}
+}

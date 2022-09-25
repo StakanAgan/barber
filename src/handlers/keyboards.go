@@ -5,6 +5,7 @@ import tele "gopkg.in/telebot.v3"
 var (
 	BtnShifts          = MainBarberKeyboard.Text("🗓 Смены")
 	BtnServices        = MainBarberKeyboard.Text("🧾 Цены")
+	BtnCustomers       = MainBarberKeyboard.Text("👨‍👦 Клиентосы")
 	MainBarberKeyboard = &tele.ReplyMarkup{ResizeKeyboard: true}
 
 	BarberShiftsInlineKeyboard = &tele.ReplyMarkup{}

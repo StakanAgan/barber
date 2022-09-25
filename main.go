@@ -29,6 +29,7 @@ func setHandlers(b *tele.Bot, store *repository.Store, stateManager *fsm.StateMa
 	b.Handle(&handlers.BtnCancelShift, tele.HandlerFunc(handlers.HandleCancelShift(store)))
 	b.Handle(&handlers.BtnServices, tele.HandlerFunc(handlers.HandleMainServices(store)))
 	b.Handle(&handlers.BtnCreateService, tele.HandlerFunc(handlers.HandleStartCreateService(stateManager)))
+	b.Handle(&handlers.BtnCustomers, tele.HandlerFunc(handlers.HandleCustomers(store)))
 	b.Handle(tele.OnText, tele.HandlerFunc(handlers.HandleText(store, stateManager)))
 
 	// customer handlers
@@ -53,24 +54,12 @@ func main() {
 		ParseMode: tele.ModeHTML,
 		Verbose:   os.Getenv("DEBUG") == "true",
 	}
-	//if os.Getenv("ENV") != "local" {
-	//	pref = tele.Settings{
-	//		Token: os.Getenv("BOT_TOKEN"),
-	//		Poller: &tele.Webhook{
-	//			TLS: &tele.WebhookTLS{Key: "/var/certs/privkey.pem", Cert: "/var/certs/cert.pem"},
-	//		},
-	//		ParseMode: tele.ModeHTML,
-	//		Verbose:   os.Getenv("DEBUG") == "true",
-	//	}
-	//}
 
 	ctx := context.Background()
 	store, closer := repository.New(ctx)
-	defer closer()
 
 	stateManager, managerCloser := fsm.New(ctx)
 	log.Println("INFO: Redis connected...")
-	defer managerCloser()
 
 	b, err := tele.NewBot(pref)
 	if err != nil {
@@ -83,5 +72,8 @@ func main() {
 	log.Println("INFO: Set handlers...")
 	setHandlers(b, store, stateManager)
 	log.Println("INFO: Bot started...")
+	defer closer()
+	defer managerCloser()
+
 	b.Start()
 }
