@@ -3,6 +3,7 @@ package repository
 import (
 	"benny/src"
 	"context"
+	"errors"
 	"fmt"
 	"github.com/edgedb/edgedb-go"
 	"log"
@@ -62,6 +63,10 @@ func NewDBClient(ctx context.Context) (*edgedb.Client, func()) {
 func DBHealthCheck(client *edgedb.Client, ctx context.Context) {
 	var result string
 	err := client.QuerySingle(ctx, "SELECT 'EdgeDB connected...'", &result)
+	var edbErr edgedb.Error
+	if errors.As(err, &edbErr) && edbErr.Category(edgedb.NoDataError) {
+		log.Printf("ERROR: on healthcheck, err: %s", edbErr)
+	}
 	if err != nil {
 		log.Fatal(fmt.Sprintf("Can't connect to DB, err: %s", err))
 	}

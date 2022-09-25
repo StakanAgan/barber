@@ -3,6 +3,7 @@ package repository
 import (
 	"benny/src/models"
 	"context"
+	"errors"
 	"fmt"
 	"github.com/edgedb/edgedb-go"
 	"log"
@@ -36,6 +37,10 @@ func (r *CustomerRepositoryImpl) GetByTelegramId(telegramId int64) (models.Custo
 	var customer models.Customer
 	var query = fmt.Sprintf("select Customer{id, fullName, phone, timeZoneOffset} filter .telegramId = %d;", telegramId)
 	err := r.client.QuerySingle(r.ctx, query, &customer)
+	var edbErr edgedb.Error
+	if errors.As(err, &edbErr) && edbErr.Category(edgedb.NoDataError) {
+		log.Printf("ERROR: on get customer by tg Id, err: %s", edbErr)
+	}
 	if err != nil {
 		log.Printf("ERROR: error on get customer by tg id, tgId: %d, err: %s", telegramId, err)
 	}
