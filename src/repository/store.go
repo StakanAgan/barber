@@ -24,7 +24,11 @@ type Store struct {
 var config = src.NewDBConfig()
 
 func NewDBClient(ctx context.Context) (*edgedb.Client, func()) {
-	opts := edgedb.Options{}
+	opts := edgedb.Options{
+		Concurrency:        4,
+		WaitUntilAvailable: 3 * time.Second,
+		ConnectTimeout:     5 * time.Second,
+	}
 	if os.Getenv("ENV") != "local" {
 		opts = edgedb.Options{
 			Database:           config.DBName,
@@ -47,7 +51,7 @@ func NewDBClient(ctx context.Context) (*edgedb.Client, func()) {
 	}
 	DBHealthCheck(client, ctx)
 	go func() {
-		for range time.Tick(time.Minute * 3) {
+		for range time.Tick(time.Second) {
 			DBHealthCheck(client, ctx)
 		}
 	}()
@@ -64,7 +68,7 @@ func DBHealthCheck(client *edgedb.Client, ctx context.Context) {
 	var result string
 	err := client.QuerySingle(ctx, "SELECT 'EdgeDB connected...'", &result)
 	var edbErr edgedb.Error
-	if errors.As(err, &edbErr) && edbErr.Category(edgedb.NoDataError) {
+	if errors.As(err, &edbErr) && edbErr.Category(edgedb.ClientError) {
 		log.Printf("ERROR: on healthcheck, err: %s", edbErr)
 	}
 	if err != nil {
