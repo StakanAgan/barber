@@ -51,7 +51,7 @@ func NewDBClient(ctx context.Context) (*edgedb.Client, func()) {
 	}
 	DBHealthCheck(client, ctx)
 	go func() {
-		for range time.Tick(time.Second) {
+		for range time.Tick(5 * time.Minute) {
 			DBHealthCheck(client, ctx)
 		}
 	}()
