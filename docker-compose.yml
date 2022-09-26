@@ -1,0 +1,45 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    command: "go run benny"
+#    volumes:
+#      - credentials/certs:/var/certs
+#    ports:
+#      - "8000:80"
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - dragonfly
+
+  db:
+    image: edgedb/edgedb:2.1
+    restart: always
+    environment:
+      - EDGEDB_SERVER_ADMIN_UI=enabled
+    env_file:
+      - .env
+    volumes:
+      - ./dbschema:/dbschema
+      - ./credentials:/root/.config/edgedb/credentials
+      - ./volumes/edgedb_data:/var/lib/edgedb/data
+
+  dragonfly:
+    build:
+      context: .
+      dockerfile: dragonfly.Dockerfile
+    restart: always
+    ulimits:
+      memlock: -1
+    env_file:
+      - .env
+    volumes:
+      - dragonflydata:/data
+
+volumes:
+  dragonflydata:
